@@ -1,0 +1,14 @@
+(library 
+ (name ppx_encoding) 
+ (public_name ppx_encoding) 
+ (kind ppx_deriver)
+ (libraries 
+            ppx_encoding_expander 
+            data-encoding 
+            base 
+            ppxlib
+ )
+ (preprocess no_preprocessing)
+)
+
+

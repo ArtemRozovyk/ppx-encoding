@@ -1,0 +1,5 @@
+(library
+  (name ppx_encoding_expander)
+  (public_name ppx_encoding.expander)
+  (libraries base ppxlib data-encoding)
+  (preprocess (pps ppxlib.metaquot)))
