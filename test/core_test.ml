@@ -23,9 +23,62 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type t = int [@@deriving_inline encoding]
 
-open Ppxlib
+let _ = fun (_ : t) -> ()
 
 let encoding =
-  Deriving.add "encoding"
-    ~str_type_decl:(Deriving.Generator.make_noarg Ppx_encoding_expander.str_type_decl)
+  let open! Data_encoding in
+  int31
+
+let _ = encoding
+
+[@@@end]
+
+type t2 = string [@@deriving_inline encoding]
+
+let _ = fun (_ : t2) -> ()
+
+let encoding_of_t2 =
+  let open! Data_encoding in
+  string
+
+let _ = encoding_of_t2
+
+[@@@end]
+
+type t3 = t [@@deriving_inline encoding]
+
+let _ = fun (_ : t3) -> ()
+
+let encoding_of_t3 =
+  let open! Data_encoding in
+  encoding
+
+let _ = encoding_of_t3
+
+[@@@end]
+
+type t4 = t2 [@@deriving_inline encoding]
+
+let _ = fun (_ : t4) -> ()
+let encoding_of_t4 = let open! Data_encoding in encoding_of_t2
+let _ = encoding_of_t4
+
+[@@@end]
+
+type t5 = int list [@@deriving_inline encoding]
+
+let _ = fun (_ : t5) -> ()
+let encoding_of_t5 = let open! Data_encoding in list int31
+let _ = encoding_of_t5
+[@@@end]
+
+
+type t6 = t list [@@deriving_inline encoding]
+
+let _ = fun (_ : t6) -> ()
+let encoding_of_t6 = let open! Data_encoding in list encoding
+let _ = encoding_of_t6
+
+[@@@end]
