@@ -40,6 +40,10 @@ let rec generate_encoding core_t =
   let loc = { core_t.ptyp_loc with loc_ghost = true } in
   match core_t.ptyp_desc with
   | Ptyp_tuple _ -> failwith "Not yet implemented."
+  | Ptyp_constr ({ txt = Ldot (modules, typ); _ }, _) ->
+      let ldot_type_enc_name = name_of_type_name typ in
+      [%expr
+        [%e T.pexp_ident ~loc { txt = Ldot (modules, ldot_type_enc_name); loc }]]
   | Ptyp_constr ({ txt = Lident "list"; _ }, [ tp ]) ->
       [%expr list [%e generate_encoding tp]]
   | Ptyp_constr ({ txt = Lident "string"; _ }, []) -> [%expr string]
