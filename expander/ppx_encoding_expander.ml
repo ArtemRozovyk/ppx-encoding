@@ -29,7 +29,6 @@ open Ast_builder.Default
 module T = Ppxlib.Ast_builder.Default
 module A = Ast_helpers
 
-
 let name_of_type_name = function
   | "t" -> "encoding"
   | type_name -> "encoding_of_" ^ type_name
@@ -51,12 +50,24 @@ let rec generate_encoding core_t =
   | Ptyp_constr ({ txt = Lident "float"; _ }, []) -> [%expr float]
   | Ptyp_constr ({ txt = Lident "bool"; _ }, []) -> [%expr bool]
   | Ptyp_constr ({ txt = Lident id; _ }, _) ->
-      let type_enc_name = name_of_type_name id
-      in
+      let type_enc_name = name_of_type_name id in
       [%expr [%e T.pexp_ident ~loc { txt = Lident type_enc_name; loc }]]
   | _ ->
       Location.raise_errorf ~loc
         " [Ppx_encoding] : generate_encoding -> Unsupported type"
+
+let single_field_record ~loc ld =
+  let name = ld.pld_name.txt in
+  let type_enc = generate_encoding ld.pld_type in
+  let f1 = A.fun_record_from_name_inj ~loc name in
+  let f2 = A.fun_record_from_name_proj ~loc name in
+  [%expr conv [%e f1] [%e f2] [%e type_enc]]
+
+let generate_record_enc ~loc ldl =
+  match ldl with
+  | [] -> [%expr []]
+  | [ ld ] -> single_field_record ~loc ld
+  | _ -> failwith "Not yet implemented."
 
 (* Construct an object item that represents the encoding of
  a type based on its kind  *)
@@ -78,7 +89,7 @@ let encode_td td =
            empty variant"
     | Ptype_variant [ _ ] -> failwith "Not yet implemented."
     | Ptype_variant _ -> failwith "Not yet implemented."
-    | Ptype_record _ -> failwith "Not yet implemented."
+    | Ptype_record ldl -> generate_record_enc ~loc ldl
     | Ptype_open -> failwith "Not yet implemented."
   in
   let name = name_of_type_name td.ptype_name.txt in
@@ -92,7 +103,7 @@ let encode_td td =
 (* Entry point of the deriver*)
 let str_type_decl ~loc ~path:_ (_rf, tds) =
   match tds with
-  | [ td ] ->  encode_td td
+  | [ td ] -> encode_td td
   | _ ->
       Location.raise_errorf ~loc
         "[Ppx_encoding] : str_type_decl -> Deriving only one type at a time is \
