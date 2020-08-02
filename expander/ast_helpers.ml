@@ -8,6 +8,18 @@ let name_of_type_name = function
   | "t" -> "encoding"
   | type_name -> "encoding_of_" ^ type_name
 
+let rec take_a n list tl =
+  if n > 0 then
+    match list with
+    | [] -> failwith "Not enough elements in list"
+    | x :: xs -> take_a (n - 1) xs (tl @ [ x ])
+  else (tl, list)
+
+(* split list into two lists (l1,l2) such that l1 contains 
+n elements of the initial list and l2 containst the rets *)
+let take_split n list = take_a n list []
+
+
 
 (* Construct an expression that represents the encoding of
  a core type (ast leafs) *)
@@ -31,18 +43,23 @@ let rec generate_encoding core_t =
   | _ ->
       Location.raise_errorf ~loc
         " [Ppx_encoding] : generate_encoding -> Unsupported type"
+        and make_tup_n ~loc ctl =
+  let sz = List.length ctl in
+  if sz <= 10 then
+    T.pexp_apply ~loc
+      (T.pexp_ident ~loc { txt = Lident ("tup" ^ Int.to_string sz); loc })
+      (List.map ~f:(fun ct -> (Nolabel, generate_encoding ct)) ctl)
+  else
+    let l1, l2 = take_split (sz / 2) (* or 10 *) ctl in
+    T.pexp_apply ~loc
+      (T.pexp_ident ~loc { txt = Lident "merge_tups"; loc })
+      [
+        (Nolabel, [%expr [%e make_tup_n ~loc l1]]);
+        (Nolabel, [%expr [%e make_tup_n ~loc l2]]);
+      ]
 
 
-let rec take_a n list tl =
-  if n > 0 then
-    match list with
-    | [] -> failwith "Not enough elements in list"
-    | x :: xs -> take_a (n - 1) xs (tl @ [ x ])
-  else (tl, list)
 
-(* split list into two lists (l1,l2) such that l1 contains 
-n elements of the initial list and l2 containst the rets *)
-let take_split n list = take_a n list []
 
 let make_obj_arg ct =
   match ct.ptyp_desc with
@@ -204,3 +221,147 @@ let fun_ll_proj ~loc lbl =
     else make_obj_n ~loc ldl
   in
   [%expr conv [%e f1] [%e f2] [%e enc]]
+
+
+
+let construct_fun_var_inj ~loc cd =
+  let name = String.lowercase cd.pcd_name.txt in
+  let pat_var = T.pexp_ident ~loc { txt = Lident name; loc } in
+  let construct =
+    T.ppat_construct ~loc
+      { txt = Lident cd.pcd_name.txt; loc }
+      (Some (T.ppat_var ~loc { txt = name; loc }))
+  in
+  T.pexp_fun ~loc Nolabel None construct pat_var
+
+
+let construct_fun_unit_inj ~loc cd =
+  let name = "()" in
+  let pat_var =
+    T.ppat_construct ~loc { txt = Lident cd.pcd_name.txt; loc } None
+  in
+  let construct = T.pexp_construct ~loc { txt = Lident name; loc } None in
+  T.pexp_fun ~loc Nolabel None pat_var construct
+
+let construct_fun_tuple_inj ~loc cd ctl =
+  let name = String.lowercase cd.pcd_name.txt in
+  let pat_var =
+    if List.length ctl < 11 then
+      T.pexp_tuple ~loc
+        (List.mapi
+           ~f:(fun i _ ->
+             T.pexp_ident ~loc
+               { txt = Lident (String.lowercase name ^ Int.to_string i); loc })
+           ctl)
+    else
+      make_nested_pexp_tuple ~loc
+        (List.mapi ~f:(fun i _ -> String.lowercase name ^ Int.to_string i) ctl)
+  in
+  let construct =
+    T.ppat_construct ~loc
+      { txt = Lident cd.pcd_name.txt; loc }
+      (Some
+         (T.ppat_tuple ~loc
+            (List.mapi
+               ~f:(fun i _ ->
+                 T.ppat_var ~loc
+                   { txt = String.lowercase name ^ Int.to_string i; loc })
+               ctl)))
+  in
+  T.pexp_fun ~loc Nolabel None construct pat_var
+
+let fun_from_constructor_inj ~loc cd =
+  match cd.pcd_args with
+  | Pcstr_tuple [] -> construct_fun_unit_inj ~loc cd
+  | Pcstr_tuple [ _ ] -> construct_fun_var_inj ~loc cd
+  | Pcstr_tuple ctl -> construct_fun_tuple_inj ~loc cd ctl
+  | _ ->
+      Location.raise_errorf ~loc
+        "[Ppx_encoding] : enc_from_carg -> Records should not appear here %s"
+        cd.pcd_name.txt
+
+let construct_fun_tuple2 ~loc cd ctl =
+  let name = String.lowercase cd.pcd_name.txt in
+  let pat_var =
+    if List.length ctl < 11 then
+      T.ppat_tuple ~loc
+        (List.mapi
+           ~f:(fun i _ ->
+             T.ppat_var ~loc
+               { txt = String.lowercase name ^ Int.to_string i; loc })
+           ctl)
+    else
+      make_nested_ppat_tuple ~loc
+        (List.mapi ~f:(fun i _ -> String.lowercase name ^ Int.to_string i) ctl)
+  in
+  let construct =
+    T.pexp_construct ~loc
+      { txt = Lident cd.pcd_name.txt; loc }
+      (Some
+         (T.pexp_tuple ~loc
+            (List.mapi
+               ~f:(fun i _ ->
+                 T.pexp_ident ~loc
+                   {
+                     txt = Lident (String.lowercase name ^ Int.to_string i);
+                     loc;
+                   })
+               ctl)))
+  in
+  T.pexp_fun ~loc Nolabel None pat_var construct
+
+
+let construct_fun_var2 ~loc cd =
+  let name = String.lowercase cd.pcd_name.txt in
+  let pat_var = T.ppat_var ~loc { txt = name; loc } in
+  let construct =
+    T.pexp_construct ~loc
+      { txt = Lident cd.pcd_name.txt; loc }
+      (Some (T.pexp_ident ~loc { txt = Lident name; loc }))
+  in
+  T.pexp_fun ~loc Nolabel None pat_var construct
+
+let construct_fun_unit2 ~loc cd =
+  let name = "()" in
+  let pat_var = T.ppat_construct ~loc { txt = Lident name; loc } None in
+  let construct =
+    T.pexp_construct ~loc { txt = Lident cd.pcd_name.txt; loc } None
+  in
+  T.pexp_fun ~loc Nolabel None pat_var construct
+
+
+let fun_from_constructor_proj ~loc cd =
+  match cd.pcd_args with
+  | Pcstr_tuple [] -> construct_fun_unit2 ~loc cd
+  | Pcstr_tuple [ _ ] -> construct_fun_var2 ~loc cd
+  | Pcstr_tuple ctl -> construct_fun_tuple2 ~loc cd ctl
+  | _ ->
+      Location.raise_errorf ~loc
+        "[Ppx_encoding] : enc_from_carg -> Records should not appear here %s"
+        cd.pcd_name.txt
+
+
+     
+let object1 ~loc enc cname =
+  [%expr
+    obj1 (req [%e T.pexp_constant ~loc (Pconst_string (cname, None))] [%e enc])]
+let enc_from_carg ~loc carg cname =
+  match carg with
+  | Pcstr_tuple [ ct ] -> object1 ~loc (generate_encoding ct) cname
+  | Pcstr_tuple [] -> object1 ~loc [%expr unit] cname
+  | Pcstr_tuple ctl -> object1 ~loc [%expr [%e make_tup_n ~loc ctl]] cname
+  | Pcstr_record _ ->
+      Location.raise_errorf
+        "[Ppx_encoding] : enc_from_carg -> Records should not appear here %s, "
+        cname
+
+let encode_variant_tuple_conv ~loc cd =
+  let f1 = fun_from_constructor_inj ~loc cd in
+  let f2 = fun_from_constructor_proj ~loc cd in
+  [%expr
+    conv [%e f1] [%e f2] [%e enc_from_carg ~loc cd.pcd_args cd.pcd_name.txt]]
+
+  let single_case_variant ~loc cd =
+  match cd.pcd_args with
+  | Pcstr_tuple _ -> encode_variant_tuple_conv ~loc cd
+  | Pcstr_record _ -> failwith "Inline record fail"

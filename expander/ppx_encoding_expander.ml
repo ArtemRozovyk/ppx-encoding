@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -47,12 +47,15 @@ let encode_td td =
         Location.raise_errorf ~loc
           "[Ppx_encoding] : encode_td -> Encoding cannot be derived for an \
            empty variant"
-    | Ptype_variant [ _ ] -> failwith "Not yet implemented."
+    | Ptype_variant [ cd ] -> A.single_case_variant ~loc cd
     | Ptype_variant _ -> failwith "Not yet implemented."
-    | Ptype_record  [] -> [%expr []]
-   | Ptype_record [ ld ] -> A.single_field_record ~loc ld
-   | Ptype_record ldl -> A.mult_field_record ~loc ldl
-    | Ptype_open -> failwith "Not yet implemented."
+    | Ptype_record [] -> [%expr []]
+    | Ptype_record [ ld ] -> A.single_field_record ~loc ld
+    | Ptype_record ldl -> A.mult_field_record ~loc ldl
+    | Ptype_open ->
+        Location.raise_errorf ~loc
+          "[Ppx_encoding] : encode_td -> Encoding cannot be derived for open \
+           types"
   in
   let name = A.name_of_type_name td.ptype_name.txt in
 
