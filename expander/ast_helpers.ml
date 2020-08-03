@@ -280,7 +280,7 @@ let fun_from_constructor_inj ~loc cd =
         "[Ppx_encoding] : enc_from_carg -> Records should not appear here %s"
         cd.pcd_name.txt
 
-let construct_fun_tuple2 ~loc cd ctl =
+let construct_fun_tuple_proj ~loc cd ctl =
   let name = String.lowercase cd.pcd_name.txt in
   let pat_var =
     if List.length ctl < 11 then
@@ -311,7 +311,7 @@ let construct_fun_tuple2 ~loc cd ctl =
   T.pexp_fun ~loc Nolabel None pat_var construct
 
 
-let construct_fun_var2 ~loc cd =
+let construct_fun_var_proj ~loc cd =
   let name = String.lowercase cd.pcd_name.txt in
   let pat_var = T.ppat_var ~loc { txt = name; loc } in
   let construct =
@@ -321,7 +321,7 @@ let construct_fun_var2 ~loc cd =
   in
   T.pexp_fun ~loc Nolabel None pat_var construct
 
-let construct_fun_unit2 ~loc cd =
+let construct_fun_unit_proj ~loc cd =
   let name = "()" in
   let pat_var = T.ppat_construct ~loc { txt = Lident name; loc } None in
   let construct =
@@ -332,9 +332,9 @@ let construct_fun_unit2 ~loc cd =
 
 let fun_from_constructor_proj ~loc cd =
   match cd.pcd_args with
-  | Pcstr_tuple [] -> construct_fun_unit2 ~loc cd
-  | Pcstr_tuple [ _ ] -> construct_fun_var2 ~loc cd
-  | Pcstr_tuple ctl -> construct_fun_tuple2 ~loc cd ctl
+  | Pcstr_tuple [] -> construct_fun_unit_proj ~loc cd
+  | Pcstr_tuple [ _ ] -> construct_fun_var_proj ~loc cd
+  | Pcstr_tuple ctl -> construct_fun_tuple_proj ~loc cd ctl
   | _ ->
       Location.raise_errorf ~loc
         "[Ppx_encoding] : enc_from_carg -> Records should not appear here %s"
@@ -361,7 +361,66 @@ let encode_variant_tuple_conv ~loc cd =
   [%expr
     conv [%e f1] [%e f2] [%e enc_from_carg ~loc cd.pcd_args cd.pcd_name.txt]]
 
+
+
+
+
+
+let variant_inline_record_conv ~loc _ldl cd =
+  let label_list = List.map ~f:(fun x -> x.pld_name.txt) _ldl in
+  let name = cd.pcd_name.txt in
+  let constr =
+    T.ppat_construct ~loc { txt = Lident name; loc }
+      (Some
+         (T.ppat_record ~loc
+            (List.map
+               ~f:(fun x ->
+                 ({ txt = Lident x; loc }, T.ppat_var ~loc { txt = x; loc }))
+               label_list)
+            Closed))
+  in
+  let f1 =
+    T.pexp_fun ~loc Nolabel None constr
+      (*if multiple ld then tuple *)
+      ( if List.length label_list = 1 then
+        T.pexp_ident ~loc { txt = Lident (List.hd_exn label_list); loc }
+      else if List.length label_list < 11 then
+        T.pexp_tuple ~loc
+          (List.map
+             ~f:(fun name -> T.pexp_ident ~loc { txt = Lident name; loc })
+             label_list)
+      else make_nested_pexp_tuple ~loc label_list )
+  in
+  let constr2 =
+    (*if multiple ld then tuple *)
+    if List.length label_list = 1 then
+      T.ppat_var ~loc { txt = List.hd_exn label_list; loc }
+    else if List.length _ldl < 11 then
+      T.ppat_tuple ~loc
+        (List.map
+           ~f:(fun name -> T.ppat_var ~loc { txt = name; loc })
+           label_list)
+    else make_nested_ppat_tuple ~loc label_list
+  in
+  let f2 =
+    T.pexp_fun ~loc Nolabel None constr2
+      (T.pexp_construct ~loc { txt = Lident name; loc }
+         (Some
+            (T.pexp_record ~loc
+               (List.map
+                  ~f:(fun x ->
+                    ( { txt = Lident x; loc },
+                      T.pexp_ident ~loc { txt = Lident x; loc } ))
+                  label_list)
+               None)))
+  in
+  [%expr
+    conv [%e f1] [%e f2]
+      [%e
+        if List.length _ldl < 11 then objN_enc_from_ldl ~loc _ldl
+        else make_obj_n ~loc _ldl]]
+
   let single_case_variant ~loc cd =
   match cd.pcd_args with
   | Pcstr_tuple _ -> encode_variant_tuple_conv ~loc cd
-  | Pcstr_record _ -> failwith "Inline record fail"
+  | Pcstr_record ldl -> variant_inline_record_conv ~loc ldl cd
