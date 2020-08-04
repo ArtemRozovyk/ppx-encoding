@@ -60,4 +60,12 @@ val mult_field_record :
   Ppxlib.expression
 
 val single_case_variant :
-  loc:Ppxlib__.Import.location -> Ppxlib.constructor_declaration -> Ppxlib.expression
+  loc:Ppxlib__.Import.location ->
+  Ppxlib.constructor_declaration ->
+  Ppxlib.expression
+
+val generate_cases :
+  loc:Ppxlib__.Import.location ->
+  Ppxlib.constructor_declaration list ->
+  int ->
+  Ppxlib.expression list

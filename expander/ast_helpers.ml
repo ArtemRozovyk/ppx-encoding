@@ -1,8 +1,6 @@
 open Ppxlib
 open Base
-
 module T = Ppxlib.Ast_builder.Default
-
 
 let name_of_type_name = function
   | "t" -> "encoding"
@@ -19,14 +17,12 @@ let rec take_a n list tl =
 n elements of the initial list and l2 containst the rets *)
 let take_split n list = take_a n list []
 
-
-
 (* Construct an expression that represents the encoding of
  a core type (ast leafs) *)
 let rec generate_encoding core_t =
   let loc = { core_t.ptyp_loc with loc_ghost = true } in
   match core_t.ptyp_desc with
-  | Ptyp_tuple _ -> failwith "Not yet implemented."
+  | Ptyp_tuple _ -> failwith "Not yet implemented tup."
   | Ptyp_constr ({ txt = Ldot (modules, typ); _ }, _) ->
       let ldot_type_enc_name = name_of_type_name typ in
       [%expr
@@ -43,7 +39,8 @@ let rec generate_encoding core_t =
   | _ ->
       Location.raise_errorf ~loc
         " [Ppx_encoding] : generate_encoding -> Unsupported type"
-        and make_tup_n ~loc ctl =
+
+and make_tup_n ~loc ctl =
   let sz = List.length ctl in
   if sz <= 10 then
     T.pexp_apply ~loc
@@ -57,9 +54,6 @@ let rec generate_encoding core_t =
         (Nolabel, [%expr [%e make_tup_n ~loc l1]]);
         (Nolabel, [%expr [%e make_tup_n ~loc l2]]);
       ]
-
-
-
 
 let make_obj_arg ct =
   match ct.ptyp_desc with
@@ -100,8 +94,6 @@ let rec make_obj_n ~loc ldl =
         (Nolabel, [%expr [%e make_obj_n ~loc l2]]);
       ]
 
-
-
 (* Single field record injection function *)
 let fun_record_from_name_inj ~loc name =
   let ppat_record =
@@ -124,6 +116,7 @@ let fun_record_from_name_proj ~loc name =
       None
   in
   T.pexp_fun ~loc Nolabel None pat_var construct
+
 (* Applying the mu operation for a recurive type *)
 let apply_mu_op ~loc name inter_expr =
   let pat_var = T.ppat_var ~loc { txt = name ^ "_encoding"; loc } in
@@ -131,7 +124,6 @@ let apply_mu_op ~loc name inter_expr =
     mu
       [%e T.pexp_constant ~loc (Pconst_string (name, None))]
       [%e T.pexp_fun ~loc Nolabel None pat_var inter_expr]]
-
 
 (* make tuple pattern from label list*)
 
@@ -147,7 +139,6 @@ let rec make_nested_ppat_tuple ~loc ctl =
   let arg1 = make_arg l1 in
   let arg2 = make_arg l2 in
   T.ppat_tuple ~loc [ arg1; arg2 ]
-
 
 (* make tuple expression from label list*)
 let rec make_nested_pexp_tuple ~loc ctl =
@@ -183,7 +174,6 @@ let fun_ll_inj ~loc lbl =
   in
   T.pexp_fun ~loc Nolabel None ppat_record construct
 
-
 (* Multiple field record projection function *)
 
 let fun_ll_proj ~loc lbl =
@@ -204,15 +194,14 @@ let fun_ll_proj ~loc lbl =
   in
   T.pexp_fun ~loc Nolabel None pat_var construct
 
-  let single_field_record ~loc ld =
+let single_field_record ~loc ld =
   let name = ld.pld_name.txt in
   let type_enc = generate_encoding ld.pld_type in
   let f1 = fun_record_from_name_inj ~loc name in
   let f2 = fun_record_from_name_proj ~loc name in
   [%expr conv [%e f1] [%e f2] [%e type_enc]]
 
-
-  let mult_field_record ~loc ldl =
+let mult_field_record ~loc ldl =
   let label_list = List.map ~f:(fun x -> x.pld_name.txt) ldl in
   let f1 = fun_ll_inj ~loc label_list in
   let f2 = fun_ll_proj ~loc label_list in
@@ -221,8 +210,6 @@ let fun_ll_proj ~loc lbl =
     else make_obj_n ~loc ldl
   in
   [%expr conv [%e f1] [%e f2] [%e enc]]
-
-
 
 let construct_fun_var_inj ~loc cd =
   let name = String.lowercase cd.pcd_name.txt in
@@ -233,7 +220,6 @@ let construct_fun_var_inj ~loc cd =
       (Some (T.ppat_var ~loc { txt = name; loc }))
   in
   T.pexp_fun ~loc Nolabel None construct pat_var
-
 
 let construct_fun_unit_inj ~loc cd =
   let name = "()" in
@@ -310,7 +296,6 @@ let construct_fun_tuple_proj ~loc cd ctl =
   in
   T.pexp_fun ~loc Nolabel None pat_var construct
 
-
 let construct_fun_var_proj ~loc cd =
   let name = String.lowercase cd.pcd_name.txt in
   let pat_var = T.ppat_var ~loc { txt = name; loc } in
@@ -329,7 +314,6 @@ let construct_fun_unit_proj ~loc cd =
   in
   T.pexp_fun ~loc Nolabel None pat_var construct
 
-
 let fun_from_constructor_proj ~loc cd =
   match cd.pcd_args with
   | Pcstr_tuple [] -> construct_fun_unit_proj ~loc cd
@@ -340,11 +324,10 @@ let fun_from_constructor_proj ~loc cd =
         "[Ppx_encoding] : enc_from_carg -> Records should not appear here %s"
         cd.pcd_name.txt
 
-
-     
 let object1 ~loc enc cname =
   [%expr
     obj1 (req [%e T.pexp_constant ~loc (Pconst_string (cname, None))] [%e enc])]
+
 let enc_from_carg ~loc carg cname =
   match carg with
   | Pcstr_tuple [ ct ] -> object1 ~loc (generate_encoding ct) cname
@@ -360,11 +343,6 @@ let encode_variant_tuple_conv ~loc cd =
   let f2 = fun_from_constructor_proj ~loc cd in
   [%expr
     conv [%e f1] [%e f2] [%e enc_from_carg ~loc cd.pcd_args cd.pcd_name.txt]]
-
-
-
-
-
 
 let variant_inline_record_conv ~loc _ldl cd =
   let label_list = List.map ~f:(fun x -> x.pld_name.txt) _ldl in
@@ -420,7 +398,186 @@ let variant_inline_record_conv ~loc _ldl cd =
         if List.length _ldl < 11 then objN_enc_from_ldl ~loc _ldl
         else make_obj_n ~loc _ldl]]
 
-  let single_case_variant ~loc cd =
+let case_from_constructor_decl1_tuple ~loc cd ctl =
+  let name = cd.pcd_name.txt in
+  let lhs =
+    T.ppat_construct ~loc { txt = Lident name; loc }
+      (Some
+         (T.ppat_tuple ~loc
+            (List.mapi
+               ~f:(fun i _ ->
+                 T.ppat_var ~loc
+                   { txt = String.lowercase name ^ Int.to_string i; loc })
+               ctl)))
+  in
+  let name = String.lowercase name in
+  let rhs =
+    T.pexp_construct ~loc
+      { txt = Lident "Some"; loc }
+      (Some
+         ( if List.length ctl < 11 then
+           T.pexp_tuple ~loc
+             (List.mapi
+                ~f:(fun i _ ->
+                  T.pexp_ident ~loc
+                    {
+                      txt = Lident (String.lowercase name ^ Int.to_string i);
+                      loc;
+                    })
+                ctl)
+         else
+           make_nested_pexp_tuple ~loc
+             (List.mapi
+                ~f:(fun i _ -> String.lowercase name ^ Int.to_string i)
+                ctl) ))
+  in
+  T.case ~lhs ~guard:None ~rhs
+
+let single_case_variant ~loc cd =
   match cd.pcd_args with
   | Pcstr_tuple _ -> encode_variant_tuple_conv ~loc cd
   | Pcstr_record ldl -> variant_inline_record_conv ~loc ldl cd
+
+let case_from_constructor_decl2 ~loc =
+  let lhs = T.ppat_any ~loc in
+  let rhs = T.pexp_construct ~loc { txt = Lident "None"; loc } None in
+  T.case ~lhs ~guard:None ~rhs
+
+let case_from_constructor_decl1_unit ~loc name =
+  let lhs = T.ppat_construct ~loc { txt = Lident name; loc } None in
+
+  let name = "()" in
+  let rhs =
+    T.pexp_construct ~loc
+      { txt = Lident "Some"; loc }
+      (Some (T.pexp_construct ~loc { txt = Lident name; loc } None))
+  in
+  T.case ~lhs ~guard:None ~rhs
+
+let make_cases_unit ~loc cd =
+  let cname = cd.pcd_name.txt in
+  let case = [ case_from_constructor_decl1_unit ~loc cname ] in
+  let case = case @ [ case_from_constructor_decl2 ~loc ] in
+  T.pexp_function ~loc case
+
+let case_from_constructor_decl1_var ~loc cd =
+  let name = cd.pcd_name.txt in
+  let lhs =
+    T.ppat_construct ~loc { txt = Lident name; loc }
+      (Some (T.ppat_var ~loc { txt = String.lowercase name; loc }))
+  in
+  let name = String.lowercase name in
+  let rhs =
+    T.pexp_construct ~loc
+      { txt = Lident "Some"; loc }
+      (Some (T.pexp_ident ~loc { txt = Lident name; loc }))
+  in
+  T.case ~lhs ~guard:None ~rhs
+
+let case_from_cdl ~loc cd =
+  match cd.pcd_args with
+  | Pcstr_tuple [ _ ] -> case_from_constructor_decl1_var ~loc cd
+  | Pcstr_tuple ctl -> case_from_constructor_decl1_tuple ~loc cd ctl
+  | _ ->
+      Location.raise_errorf ~loc
+        "[Ppx_encoding] : case_from_cdl ->Error generating argument type of %s"
+        cd.pcd_name.txt
+
+let make_cases ~loc cd =
+  let case = [ case_from_cdl ~loc cd ] in
+  let case = case @ [ case_from_constructor_decl2 ~loc ] in
+  T.pexp_function ~loc case
+
+let function_from_constructor ~loc cd =
+  match cd.pcd_args with
+  | Pcstr_tuple [] -> make_cases_unit ~loc cd
+  | Pcstr_tuple _ -> make_cases ~loc cd
+  | _ -> make_cases ~loc cd
+
+let generate_tuple_case ~loc h n =
+  let f1 = function_from_constructor ~loc h in
+  let f2 = fun_from_constructor_proj ~loc h in
+  let tag_id = T.pexp_constant ~loc (Pconst_integer (Int.to_string n, None)) in
+  let inner_encoding = enc_from_carg ~loc h.pcd_args h.pcd_name.txt in
+  [%expr
+    case
+      ~title:[%e T.pexp_constant ~loc (Pconst_string (h.pcd_name.txt, None))]
+      (Tag [%e tag_id])
+      [%e inner_encoding] [%e f1] [%e f2]]
+
+let fun_ll_record_dec ~loc lbl cstr_name =
+  let pat_var =
+    if List.length lbl < 11 then
+      T.ppat_tuple ~loc
+        (List.map ~f:(fun name -> T.ppat_var ~loc { txt = name; loc }) lbl)
+    else make_nested_ppat_tuple ~loc lbl
+  in
+  let construct =
+    T.pexp_construct ~loc
+      { txt = Lident cstr_name; loc }
+      (Some
+         (T.pexp_record ~loc
+            (List.map
+               ~f:(fun name ->
+                 ( { txt = Lident name; loc },
+                   T.pexp_ident ~loc { txt = Lident name; loc } ))
+               lbl)
+            None))
+  in
+  T.pexp_fun ~loc Nolabel None pat_var construct
+
+let record_case_from_constructor_decl1 ~loc lbl name =
+  let lhs =
+    T.ppat_construct ~loc { txt = Lident name; loc }
+      (Some
+         (T.ppat_record ~loc
+            (List.map
+               ~f:(fun x ->
+                 ({ txt = Lident x; loc }, T.ppat_var ~loc { txt = x; loc }))
+               lbl)
+            Closed))
+  in
+  let rhs =
+    T.pexp_construct ~loc
+      { txt = Lident "Some"; loc }
+      (Some
+         ( if List.length lbl < 11 then
+           T.pexp_tuple ~loc
+             (List.map
+                ~f:(fun x -> T.pexp_ident ~loc { txt = Lident x; loc })
+                lbl)
+         else make_nested_pexp_tuple ~loc lbl ))
+  in
+  T.case ~lhs ~guard:None ~rhs
+
+let function_record_enc ~loc lbl cname =
+  let case = [ record_case_from_constructor_decl1 ~loc lbl cname ] in
+  let case = case @ [ case_from_constructor_decl2 ~loc ] in
+  T.pexp_function ~loc case
+
+let generate_record_case ~loc ldl n cname =
+  let label_list = List.map ~f:(fun x -> x.pld_name.txt) ldl in
+  let f1 = function_record_enc ~loc label_list cname in
+  let f2 = fun_ll_record_dec ~loc label_list cname in
+  let tag_id = T.pexp_constant ~loc (Pconst_integer (Int.to_string n, None)) in
+  [%expr
+    case
+      ~title:[%e T.pexp_constant ~loc (Pconst_string (cname, None))]
+      (Tag [%e tag_id])
+      [%e
+        object1 ~loc
+          ( if List.length ldl < 11 then objN_enc_from_ldl ~loc ldl
+          else make_obj_n ~loc ldl )
+          cname]
+      [%e f1] [%e f2]]
+
+let rec generate_cases ~loc cdl n =
+  match cdl with
+  | [] -> []
+  | h :: t -> (
+      match h.pcd_args with
+      | Pcstr_tuple _ ->
+          generate_tuple_case ~loc h n :: generate_cases ~loc t (n + 1)
+      | Pcstr_record lbl ->
+          generate_record_case ~loc lbl n h.pcd_name.txt
+          :: generate_cases ~loc t (n + 1) )

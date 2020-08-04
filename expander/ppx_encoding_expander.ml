@@ -21,7 +21,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Base
 open Ppxlib
 open Ast_builder.Default
 module T = Ppxlib.Ast_builder.Default
@@ -46,7 +45,8 @@ let encode_td td =
           "[Ppx_encoding] : encode_td -> Encoding cannot be derived for an \
            empty variant"
     | Ptype_variant [ cd ] -> A.single_case_variant ~loc cd
-    | Ptype_variant _ -> failwith "Not yet implemented."
+    | Ptype_variant cdl -> [%expr
+          union ~tag_size:`Uint8 [%e T.elist ~loc (A.generate_cases ~loc cdl 0)]]
     | Ptype_record [] -> [%expr []]
     | Ptype_record [ ld ] -> A.single_field_record ~loc ld
     | Ptype_record ldl -> A.mult_field_record ~loc ldl
