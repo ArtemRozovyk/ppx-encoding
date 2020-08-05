@@ -17,7 +17,6 @@ let rec take_a n list tl =
 n elements of the initial list and l2 containst the rets *)
 let take_split n list = take_a n list []
 
-
 let rec make_nested_ppat_tuple ~loc ctl =
   (* to call with numbered label list*)
   let l1, l2 = take_split (List.length ctl / 2) ctl in
@@ -85,8 +84,6 @@ let fun_tuple_proj ~loc ctl =
   in
   T.pexp_fun ~loc Nolabel None pat_var construct
 
-    
-
 (* Construct an expression that represents the encoding of
  a core type (ast leafs) *)
 let rec generate_encoding core_t =
@@ -103,6 +100,8 @@ let rec generate_encoding core_t =
   | Ptyp_constr ({ txt = Lident "int"; _ }, []) -> [%expr int31]
   | Ptyp_constr ({ txt = Lident "float"; _ }, []) -> [%expr float]
   | Ptyp_constr ({ txt = Lident "bool"; _ }, []) -> [%expr bool]
+  | Ptyp_constr ({ txt = Lident "option"; _ }, [ ct ]) ->
+      [%expr option [%e generate_encoding ct]]
   | Ptyp_constr ({ txt = Lident id; _ }, _) ->
       let type_enc_name = name_of_type_name id in
       [%expr [%e T.pexp_ident ~loc { txt = Lident type_enc_name; loc }]]
@@ -124,6 +123,7 @@ and make_tup_n ~loc ctl =
         (Nolabel, [%expr [%e make_tup_n ~loc l1]]);
         (Nolabel, [%expr [%e make_tup_n ~loc l2]]);
       ]
+
 and conv_tuples ~loc ctl =
   if List.length ctl < 11 then make_tup_n ~loc ctl
   else
@@ -132,8 +132,7 @@ and conv_tuples ~loc ctl =
     let enc = make_tup_n ~loc ctl in
     [%expr conv [%e f1] [%e f2] [%e enc]]
 
-
-
+(*Detect if the field is optional then use "opt" instead of "req" *)
 let make_obj_arg ct =
   match ct.ptyp_desc with
   | Ptyp_constr ({ txt = Lident "option"; _ }, [ oct ]) -> ("opt", oct)
@@ -205,8 +204,6 @@ let apply_mu_op ~loc name inter_expr =
       [%e T.pexp_fun ~loc Nolabel None pat_var inter_expr]]
 
 (* make tuple pattern from label list*)
-
-
 
 (* Multiple field record injection function *)
 let fun_ll_inj ~loc lbl =
