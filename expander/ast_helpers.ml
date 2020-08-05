@@ -17,12 +17,82 @@ let rec take_a n list tl =
 n elements of the initial list and l2 containst the rets *)
 let take_split n list = take_a n list []
 
+
+let rec make_nested_ppat_tuple ~loc ctl =
+  (* to call with numbered label list*)
+  let l1, l2 = take_split (List.length ctl / 2) ctl in
+  let make_arg g =
+    if List.length g < 11 then
+      T.ppat_tuple ~loc
+        (List.map ~f:(fun l -> T.ppat_var ~loc { txt = l; loc }) g)
+    else make_nested_ppat_tuple ~loc g
+  in
+  let arg1 = make_arg l1 in
+  let arg2 = make_arg l2 in
+  T.ppat_tuple ~loc [ arg1; arg2 ]
+
+(* make tuple expression from label list*)
+let rec make_nested_pexp_tuple ~loc ctl =
+  (* to call with numbered label list*)
+  let l1, l2 = take_split (List.length ctl / 2) ctl in
+  let make_arg g =
+    if List.length g < 11 then
+      T.pexp_tuple ~loc
+        (List.map ~f:(fun l -> T.pexp_ident ~loc { txt = Lident l; loc }) g)
+    else make_nested_pexp_tuple ~loc g
+  in
+  let arg1 = make_arg l1 in
+  let arg2 = make_arg l2 in
+  T.pexp_tuple ~loc [ arg1; arg2 ]
+
+let fun_tuple_inj ~loc ctl =
+  let pat_var =
+    if List.length ctl < 11 then
+      T.pexp_tuple ~loc
+        (List.mapi
+           ~f:(fun i _ ->
+             T.pexp_ident ~loc { txt = Lident ("v" ^ Int.to_string i); loc })
+           ctl)
+    else
+      make_nested_pexp_tuple ~loc
+        (List.mapi ~f:(fun i _ -> "v" ^ Int.to_string i) ctl)
+  in
+  let construct =
+    T.ppat_tuple ~loc
+      (List.mapi
+         ~f:(fun i _ -> T.ppat_var ~loc { txt = "v" ^ Int.to_string i; loc })
+         ctl)
+  in
+  T.pexp_fun ~loc Nolabel None construct pat_var
+
+let fun_tuple_proj ~loc ctl =
+  let pat_var =
+    if List.length ctl < 11 then
+      T.ppat_tuple ~loc
+        (List.mapi
+           ~f:(fun i _ -> T.ppat_var ~loc { txt = "v" ^ Int.to_string i; loc })
+           ctl)
+    else
+      make_nested_ppat_tuple ~loc
+        (List.mapi ~f:(fun i _ -> "v" ^ Int.to_string i) ctl)
+  in
+  let construct =
+    T.pexp_tuple ~loc
+      (List.mapi
+         ~f:(fun i _ ->
+           T.pexp_ident ~loc { txt = Lident ("v" ^ Int.to_string i); loc })
+         ctl)
+  in
+  T.pexp_fun ~loc Nolabel None pat_var construct
+
+    
+
 (* Construct an expression that represents the encoding of
  a core type (ast leafs) *)
 let rec generate_encoding core_t =
   let loc = { core_t.ptyp_loc with loc_ghost = true } in
   match core_t.ptyp_desc with
-  | Ptyp_tuple _ -> failwith "Not yet implemented tup."
+  | Ptyp_tuple ctl -> conv_tuples ~loc ctl
   | Ptyp_constr ({ txt = Ldot (modules, typ); _ }, _) ->
       let ldot_type_enc_name = name_of_type_name typ in
       [%expr
@@ -54,6 +124,15 @@ and make_tup_n ~loc ctl =
         (Nolabel, [%expr [%e make_tup_n ~loc l1]]);
         (Nolabel, [%expr [%e make_tup_n ~loc l2]]);
       ]
+and conv_tuples ~loc ctl =
+  if List.length ctl < 11 then make_tup_n ~loc ctl
+  else
+    let f1 = fun_tuple_inj ~loc ctl in
+    let f2 = fun_tuple_proj ~loc ctl in
+    let enc = make_tup_n ~loc ctl in
+    [%expr conv [%e f1] [%e f2] [%e enc]]
+
+
 
 let make_obj_arg ct =
   match ct.ptyp_desc with
@@ -127,32 +206,7 @@ let apply_mu_op ~loc name inter_expr =
 
 (* make tuple pattern from label list*)
 
-let rec make_nested_ppat_tuple ~loc ctl =
-  (* to call with numbered label list*)
-  let l1, l2 = take_split (List.length ctl / 2) ctl in
-  let make_arg g =
-    if List.length g < 11 then
-      T.ppat_tuple ~loc
-        (List.map ~f:(fun l -> T.ppat_var ~loc { txt = l; loc }) g)
-    else make_nested_ppat_tuple ~loc g
-  in
-  let arg1 = make_arg l1 in
-  let arg2 = make_arg l2 in
-  T.ppat_tuple ~loc [ arg1; arg2 ]
 
-(* make tuple expression from label list*)
-let rec make_nested_pexp_tuple ~loc ctl =
-  (* to call with numbered label list*)
-  let l1, l2 = take_split (List.length ctl / 2) ctl in
-  let make_arg g =
-    if List.length g < 11 then
-      T.pexp_tuple ~loc
-        (List.map ~f:(fun l -> T.pexp_ident ~loc { txt = Lident l; loc }) g)
-    else make_nested_pexp_tuple ~loc g
-  in
-  let arg1 = make_arg l1 in
-  let arg2 = make_arg l2 in
-  T.pexp_tuple ~loc [ arg1; arg2 ]
 
 (* Multiple field record injection function *)
 let fun_ll_inj ~loc lbl =
