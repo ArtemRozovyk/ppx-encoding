@@ -105,6 +105,9 @@ let rec generate_encoding core_t =
   | Ptyp_constr ({ txt = Lident id; _ }, _) ->
       let type_enc_name = name_of_type_name id in
       [%expr [%e T.pexp_ident ~loc { txt = Lident type_enc_name; loc }]]
+  | Ptyp_var name ->
+      [%expr
+        [%e T.pexp_ident ~loc { txt = Lident ("_" ^ name ^ "_encoding"); loc }]]
   | _ ->
       Location.raise_errorf ~loc
         " [Ppx_encoding] : generate_encoding -> Unsupported type"
@@ -632,3 +635,6 @@ let rec generate_cases ~loc cdl n =
       | Pcstr_record lbl ->
           generate_record_case ~loc lbl n h.pcd_name.txt
           :: generate_cases ~loc t (n + 1) )
+
+let generate_cases ~loc cdl =
+  [%expr union ~tag_size:`Uint8 [%e T.elist ~loc (generate_cases ~loc cdl 0)]]

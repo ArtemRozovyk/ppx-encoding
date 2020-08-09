@@ -67,5 +67,4 @@ val single_case_variant :
 val generate_cases :
   loc:Ppxlib__.Import.location ->
   Ppxlib.constructor_declaration list ->
-  int ->
-  Ppxlib.expression list
+  Ppxlib.expression 
