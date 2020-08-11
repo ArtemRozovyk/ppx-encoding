@@ -21,12 +21,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Base
-
 open Ppxlib
 open Ast_builder.Default
 module T = Ppxlib.Ast_builder.Default
 module A = Ast_helpers
-
 
 let get_params_from_td td =
   let var_core_type_name_exn ct =
@@ -40,11 +38,9 @@ let get_params_from_td td =
   | [] -> []
   | l -> List.map ~f:(fun (ct, _) -> var_core_type_name_exn ct.ptyp_desc) l
 
-
-
 (* Construct an object item that represents the encoding of
  a type based on its kind  *)
-let encode_td td =
+let encode_td td r_name =
   let td = name_type_params_in_td td in
   let loc = td.ptype_loc in
   let encode =
@@ -55,25 +51,34 @@ let encode_td td =
             Location.raise_errorf ~loc
               "[Ppx_encoding] : encode_td -> Encoding cannot be derived for \
                fully abstract types"
-        | Some tp -> A.generate_encoding tp )
+        | Some tp -> A.generate_encoding tp r_name )
     | Ptype_variant [] ->
         Location.raise_errorf ~loc
           "[Ppx_encoding] : encode_td -> Encoding cannot be derived for an \
            empty variant"
-    | Ptype_variant [ cd ] -> A.single_case_variant ~loc cd
-    | Ptype_variant cdl -> A.generate_cases ~loc cdl 
+    | Ptype_variant [ cd ] -> A.single_case_variant ~loc cd r_name
+    | Ptype_variant cdl -> A.generate_cases ~loc cdl r_name
     | Ptype_record [] -> [%expr []]
-    | Ptype_record [ ld ] -> A.single_field_record ~loc ld
-    | Ptype_record ldl -> A.mult_field_record ~loc ldl
+    | Ptype_record [ ld ] -> A.single_field_record ~loc ld r_name
+    | Ptype_record ldl -> A.mult_field_record ~loc ldl r_name
     | Ptype_open ->
         Location.raise_errorf ~loc
           "[Ppx_encoding] : encode_td -> Encoding cannot be derived for open \
            types"
   in
+  let encode =
+    match r_name with
+    | Some _ -> [%expr [%e A.apply_mu_op ~loc td.ptype_name.txt encode]]
+    | None -> encode
+  in
   let name = A.name_of_type_name td.ptype_name.txt in
-  let body = eabstract ~loc (List.map
+  let body =
+    eabstract ~loc
+      (List.map
          ~f:(fun lab -> T.ppat_var ~loc { txt = "_" ^ lab ^ "_encoding"; loc })
-         (get_params_from_td td)) encode in
+         (get_params_from_td td))
+      encode
+  in
   [%str
     let [%p pvar ~loc name] =
       let open! Data_encoding in
@@ -82,7 +87,12 @@ let encode_td td =
 (* Entry point of the deriver*)
 let str_type_decl ~loc ~path:_ (_rf, tds) =
   match tds with
-  | [ td ] -> encode_td td
+  | [ td ] -> (
+      (* Check if the type is effectively recursive, if so, keep
+         the name in order to be able to detect an internal recurvise call *)
+      match (new type_is_recursive _rf tds)#go () with
+      | Nonrecursive -> encode_td td None
+      | Recursive -> encode_td td (Some td.ptype_name.txt) )
   | _ ->
       Location.raise_errorf ~loc
         "[Ppx_encoding] : str_type_decl -> Deriving only one type at a time is \
