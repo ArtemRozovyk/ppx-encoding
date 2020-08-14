@@ -26,6 +26,8 @@ open Ast_builder.Default
 module T = Ppxlib.Ast_builder.Default
 module A = Ast_helpers
 
+
+(*convert type parameters into label list*)
 let get_params_from_td td =
   let var_core_type_name_exn ct =
     match ct with

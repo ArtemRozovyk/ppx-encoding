@@ -145,7 +145,7 @@ let make_obj_arg ct =
   | Ptyp_constr ({ txt = Lident "option"; _ }, [ oct ]) -> ("opt", oct)
   | _ -> ("req", ct)
 
-let objN_enc_from_ldl ~loc ldl r_name=
+let objN_enc_from_ldl ~loc ldl r_name =
   let label_list = List.map ~f:(fun x -> x.pld_name.txt) ldl in
   let core_type_list = List.map ~f:(fun x -> x.pld_type) ldl in
   let label_type_list = List.zip_exn label_list core_type_list in
@@ -167,7 +167,7 @@ let objN_enc_from_ldl ~loc ldl r_name=
 
   T.pexp_apply ~loc objN reqs
 
-let rec make_obj_n ~loc ldl r_name=
+let rec make_obj_n ~loc ldl r_name =
   let sz = List.length ldl in
   if sz <= 10 then objN_enc_from_ldl ~loc ldl r_name
   else
@@ -252,7 +252,7 @@ let fun_ll_proj ~loc lbl =
   in
   T.pexp_fun ~loc Nolabel None pat_var construct
 
-let single_field_record ~loc ld r_name=
+let single_field_record ~loc ld r_name =
   let name = ld.pld_name.txt in
   let type_enc = generate_encoding ld.pld_type r_name in
   let f1 = fun_record_from_name_inj ~loc name in
@@ -269,6 +269,7 @@ let mult_field_record ~loc ldl r_name =
   in
   [%expr conv [%e f1] [%e f2] [%e enc]]
 
+(* Single case variant injection function for one element tuple*)
 let construct_fun_var_inj ~loc cd =
   let name = String.lowercase cd.pcd_name.txt in
   let pat_var = T.pexp_ident ~loc { txt = Lident name; loc } in
@@ -279,6 +280,8 @@ let construct_fun_var_inj ~loc cd =
   in
   T.pexp_fun ~loc Nolabel None construct pat_var
 
+(* Single case variant injection function empty tuple*)
+
 let construct_fun_unit_inj ~loc cd =
   let name = "()" in
   let pat_var =
@@ -286,6 +289,8 @@ let construct_fun_unit_inj ~loc cd =
   in
   let construct = T.pexp_construct ~loc { txt = Lident name; loc } None in
   T.pexp_fun ~loc Nolabel None pat_var construct
+
+(* Single case variant injection function for mult. element tuple*)
 
 let construct_fun_tuple_inj ~loc cd ctl =
   let name = String.lowercase cd.pcd_name.txt in
@@ -314,6 +319,8 @@ let construct_fun_tuple_inj ~loc cd ctl =
   in
   T.pexp_fun ~loc Nolabel None construct pat_var
 
+(* Single case variant injection function for different tuple sizes*)
+
 let fun_from_constructor_inj ~loc cd =
   match cd.pcd_args with
   | Pcstr_tuple [] -> construct_fun_unit_inj ~loc cd
@@ -324,6 +331,7 @@ let fun_from_constructor_inj ~loc cd =
         "[Ppx_encoding] : enc_from_carg -> Records should not appear here %s"
         cd.pcd_name.txt
 
+(* Single case variant projection function *)
 let construct_fun_tuple_proj ~loc cd ctl =
   let name = String.lowercase cd.pcd_name.txt in
   let pat_var =
@@ -354,6 +362,7 @@ let construct_fun_tuple_proj ~loc cd ctl =
   in
   T.pexp_fun ~loc Nolabel None pat_var construct
 
+(* Single case variant projection function for one el. tuple*)
 let construct_fun_var_proj ~loc cd =
   let name = String.lowercase cd.pcd_name.txt in
   let pat_var = T.ppat_var ~loc { txt = name; loc } in
@@ -364,6 +373,8 @@ let construct_fun_var_proj ~loc cd =
   in
   T.pexp_fun ~loc Nolabel None pat_var construct
 
+(* Single case variant projection function for empty tuple*)
+
 let construct_fun_unit_proj ~loc cd =
   let name = "()" in
   let pat_var = T.ppat_construct ~loc { txt = Lident name; loc } None in
@@ -371,6 +382,8 @@ let construct_fun_unit_proj ~loc cd =
     T.pexp_construct ~loc { txt = Lident cd.pcd_name.txt; loc } None
   in
   T.pexp_fun ~loc Nolabel None pat_var construct
+
+(* Single case variant projection function *)
 
 let fun_from_constructor_proj ~loc cd =
   match cd.pcd_args with
@@ -382,27 +395,35 @@ let fun_from_constructor_proj ~loc cd =
         "[Ppx_encoding] : enc_from_carg -> Records should not appear here %s"
         cd.pcd_name.txt
 
+(* Applying obj1 to variant (Json) *)
 let object1 ~loc enc cname =
   [%expr
     obj1 (req [%e T.pexp_constant ~loc (Pconst_string (cname, None))] [%e enc])]
 
-let enc_from_carg ~loc carg cname r_name=
+(* generage encoding from variants constructor argument *)
+let enc_from_carg ~loc carg cname r_name =
   match carg with
   | Pcstr_tuple [ ct ] -> object1 ~loc (generate_encoding ct r_name) cname
   | Pcstr_tuple [] -> object1 ~loc [%expr unit] cname
-  | Pcstr_tuple ctl -> object1 ~loc [%expr [%e make_tup_n ~loc ctl r_name]] cname
+  | Pcstr_tuple ctl ->
+      object1 ~loc [%expr [%e make_tup_n ~loc ctl r_name]] cname
   | Pcstr_record _ ->
       Location.raise_errorf
         "[Ppx_encoding] : enc_from_carg -> Records should not appear here %s, "
         cname
 
-let encode_variant_tuple_conv ~loc cd r_name=
+(* single case variant encoding *)
+
+let encode_variant_tuple_conv ~loc cd r_name =
   let f1 = fun_from_constructor_inj ~loc cd in
   let f2 = fun_from_constructor_proj ~loc cd in
   [%expr
-    conv [%e f1] [%e f2] [%e enc_from_carg ~loc cd.pcd_args cd.pcd_name.txt r_name]]
+    conv [%e f1] [%e f2]
+      [%e enc_from_carg ~loc cd.pcd_args cd.pcd_name.txt r_name]]
 
-let variant_inline_record_conv ~loc _ldl cd r_name=
+(* single case variant with inline record encoding *)
+
+let variant_inline_record_conv ~loc _ldl cd r_name =
   let label_list = List.map ~f:(fun x -> x.pld_name.txt) _ldl in
   let name = cd.pcd_name.txt in
   let constr =
@@ -456,6 +477,8 @@ let variant_inline_record_conv ~loc _ldl cd r_name=
         if List.length _ldl < 11 then objN_enc_from_ldl ~loc _ldl r_name
         else make_obj_n ~loc _ldl r_name]]
 
+(*  function case from constructor declaration *)
+
 let case_from_constructor_decl1_tuple ~loc cd ctl =
   let name = cd.pcd_name.txt in
   let lhs =
@@ -491,15 +514,21 @@ let case_from_constructor_decl1_tuple ~loc cd ctl =
   in
   T.case ~lhs ~guard:None ~rhs
 
+(* single case variant encoding *)
+
 let single_case_variant ~loc cd =
   match cd.pcd_args with
   | Pcstr_tuple _ -> encode_variant_tuple_conv ~loc cd
   | Pcstr_record ldl -> variant_inline_record_conv ~loc ldl cd
 
+(* projection function case *)
+
 let case_from_constructor_decl2 ~loc =
   let lhs = T.ppat_any ~loc in
   let rhs = T.pexp_construct ~loc { txt = Lident "None"; loc } None in
   T.case ~lhs ~guard:None ~rhs
+
+(* projection function case for empty constructor *)
 
 let case_from_constructor_decl1_unit ~loc name =
   let lhs = T.ppat_construct ~loc { txt = Lident name; loc } None in
@@ -512,11 +541,14 @@ let case_from_constructor_decl1_unit ~loc name =
   in
   T.case ~lhs ~guard:None ~rhs
 
+(* projection function for empty constructor    *)
 let make_cases_unit ~loc cd =
   let cname = cd.pcd_name.txt in
   let case = [ case_from_constructor_decl1_unit ~loc cname ] in
   let case = case @ [ case_from_constructor_decl2 ~loc ] in
   T.pexp_function ~loc case
+
+(* function for empty constructor projection function  *)
 
 let case_from_constructor_decl1_var ~loc cd =
   let name = cd.pcd_name.txt in
@@ -531,7 +563,7 @@ let case_from_constructor_decl1_var ~loc cd =
       (Some (T.pexp_ident ~loc { txt = Lident name; loc }))
   in
   T.case ~lhs ~guard:None ~rhs
-
+(* function fcase from constructor declaration  *)
 let case_from_cdl ~loc cd =
   match cd.pcd_args with
   | Pcstr_tuple [ _ ] -> case_from_constructor_decl1_var ~loc cd
@@ -540,11 +572,12 @@ let case_from_cdl ~loc cd =
       Location.raise_errorf ~loc
         "[Ppx_encoding] : case_from_cdl ->Error generating argument type of %s"
         cd.pcd_name.txt
-
+(* projection function for non empty constructor    *)
 let make_cases ~loc cd =
   let case = [ case_from_cdl ~loc cd ] in
   let case = case @ [ case_from_constructor_decl2 ~loc ] in
   T.pexp_function ~loc case
+(*  function for variants union*)
 
 let function_from_constructor ~loc cd =
   match cd.pcd_args with
@@ -552,7 +585,8 @@ let function_from_constructor ~loc cd =
   | Pcstr_tuple _ -> make_cases ~loc cd
   | _ -> make_cases ~loc cd
 
-let generate_tuple_case ~loc h n r_name=
+(*variant tuple case *)
+let generate_tuple_case ~loc h n r_name =
   let f1 = function_from_constructor ~loc h in
   let f2 = fun_from_constructor_proj ~loc h in
   let tag_id = T.pexp_constant ~loc (Pconst_integer (Int.to_string n, None)) in
@@ -563,6 +597,7 @@ let generate_tuple_case ~loc h n r_name=
       (Tag [%e tag_id])
       [%e inner_encoding] [%e f1] [%e f2]]
 
+(*variant record projection function *)
 let fun_ll_record_dec ~loc lbl cstr_name =
   let pat_var =
     if List.length lbl < 11 then
@@ -612,6 +647,7 @@ let function_record_enc ~loc lbl cname =
   let case = [ record_case_from_constructor_decl1 ~loc lbl cname ] in
   let case = case @ [ case_from_constructor_decl2 ~loc ] in
   T.pexp_function ~loc case
+(*variant record union cases *)
 
 let generate_record_case ~loc ldl n cname r_name =
   let label_list = List.map ~f:(fun x -> x.pld_name.txt) ldl in
@@ -625,9 +661,10 @@ let generate_record_case ~loc ldl n cname r_name =
       [%e
         object1 ~loc
           ( if List.length ldl < 11 then objN_enc_from_ldl ~loc ldl r_name
-          else make_obj_n ~loc ldl r_name)
+          else make_obj_n ~loc ldl r_name )
           cname]
       [%e f1] [%e f2]]
+(*variant union cases aux. function*)
 
 let rec generate_cases ~loc cdl n r_name =
   match cdl with
@@ -635,10 +672,12 @@ let rec generate_cases ~loc cdl n r_name =
   | h :: t -> (
       match h.pcd_args with
       | Pcstr_tuple _ ->
-          generate_tuple_case ~loc h n r_name :: generate_cases ~loc t (n + 1)  r_name
+          generate_tuple_case ~loc h n r_name
+          :: generate_cases ~loc t (n + 1) r_name
       | Pcstr_record lbl ->
           generate_record_case ~loc lbl n h.pcd_name.txt r_name
-          :: generate_cases ~loc t (n + 1) r_name) 
-
-let generate_cases ~loc cdl  r_name =
-  [%expr union ~tag_size:`Uint8 [%e T.elist ~loc (generate_cases ~loc cdl 0 r_name)]]
+          :: generate_cases ~loc t (n + 1) r_name )
+(*variant union cases *)
+let generate_cases ~loc cdl r_name =
+  [%expr
+    union ~tag_size:`Uint8 [%e T.elist ~loc (generate_cases ~loc cdl 0 r_name)]]
