@@ -92,7 +92,7 @@ let str_type_decl ~loc ~path:_ (rf, tds) =
   | [ td ] -> (
       (* Check if the type is effectively recursive, if so, keep
          the name in order to be able to detect an internal recurvise call *)
-      match (new type_is_recursive _rf tds)#go () with
+      match (new type_is_recursive rf tds)#go () with
       | Nonrecursive -> encode_td td None
       | Recursive -> encode_td td (Some td.ptype_name.txt) )
   | _ ->
