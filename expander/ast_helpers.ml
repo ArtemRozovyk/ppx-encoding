@@ -1,6 +1,12 @@
+
+
+(* This module contains all the functions that generate the expression of the 
+Data_encoding.encoding based on the type declaration. *)
+
 open Ppxlib
 open Base
 module T = Ppxlib.Ast_builder.Default
+
 
 let name_of_type_name = function
   | "t" -> "encoding"
@@ -86,25 +92,25 @@ let fun_tuple_proj ~loc ctl =
 
 (* Construct an expression that represents the encoding of
  a core type (ast leafs) *)
-let rec generate_encoding core_t r_name =
+let rec generate_encoding core_t rec_name =
   let loc = { core_t.ptyp_loc with loc_ghost = true } in
   match core_t.ptyp_desc with
-  | Ptyp_tuple ctl -> conv_tuples ~loc ctl r_name
+  | Ptyp_tuple ctl -> conv_tuples ~loc ctl rec_name
   | Ptyp_constr ({ txt = Ldot (modules, typ); _ }, _) ->
       let ldot_type_enc_name = name_of_type_name typ in
       [%expr
         [%e T.pexp_ident ~loc { txt = Ldot (modules, ldot_type_enc_name); loc }]]
   | Ptyp_constr ({ txt = Lident "list"; _ }, [ tp ]) ->
-      [%expr list [%e generate_encoding tp r_name]]
+      [%expr list [%e generate_encoding tp rec_name]]
   | Ptyp_constr ({ txt = Lident "string"; _ }, []) -> [%expr string]
   | Ptyp_constr ({ txt = Lident "int"; _ }, []) -> [%expr int31]
   | Ptyp_constr ({ txt = Lident "float"; _ }, []) -> [%expr float]
   | Ptyp_constr ({ txt = Lident "bool"; _ }, []) -> [%expr bool]
   | Ptyp_constr ({ txt = Lident "option"; _ }, [ ct ]) ->
-      [%expr option [%e generate_encoding ct r_name]]
+      [%expr option [%e generate_encoding ct rec_name]]
   | Ptyp_constr ({ txt = Lident id; _ }, _) ->
       let type_enc_name =
-        match r_name with
+        match rec_name with
         | Some rn when String.equal rn id -> id ^ "_encoding"
         | _ -> name_of_type_name id
       in
@@ -116,27 +122,27 @@ let rec generate_encoding core_t r_name =
       Location.raise_errorf ~loc
         " [Ppx_encoding] : generate_encoding -> Unsupported type"
 
-and make_tup_n ~loc ctl r_name =
+and make_tup_n ~loc ctl rec_name =
   let sz = List.length ctl in
   if sz <= 10 then
     T.pexp_apply ~loc
       (T.pexp_ident ~loc { txt = Lident ("tup" ^ Int.to_string sz); loc })
-      (List.map ~f:(fun ct -> (Nolabel, generate_encoding ct r_name)) ctl)
+      (List.map ~f:(fun ct -> (Nolabel, generate_encoding ct rec_name)) ctl)
   else
     let l1, l2 = take_split (sz / 2) (* or 10 *) ctl in
     T.pexp_apply ~loc
       (T.pexp_ident ~loc { txt = Lident "merge_tups"; loc })
       [
-        (Nolabel, [%expr [%e make_tup_n ~loc l1 r_name]]);
-        (Nolabel, [%expr [%e make_tup_n ~loc l2 r_name]]);
+        (Nolabel, [%expr [%e make_tup_n ~loc l1 rec_name]]);
+        (Nolabel, [%expr [%e make_tup_n ~loc l2 rec_name]]);
       ]
 
-and conv_tuples ~loc ctl r_name =
-  if List.length ctl < 11 then make_tup_n ~loc ctl r_name
+and conv_tuples ~loc ctl rec_name =
+  if List.length ctl < 11 then make_tup_n ~loc ctl rec_name
   else
     let f1 = fun_tuple_inj ~loc ctl in
     let f2 = fun_tuple_proj ~loc ctl in
-    let enc = make_tup_n ~loc ctl r_name in
+    let enc = make_tup_n ~loc ctl rec_name in
     [%expr conv [%e f1] [%e f2] [%e enc]]
 
 (*Detect if the field is optional then use "opt" instead of "req" *)
@@ -145,7 +151,9 @@ let make_obj_arg ct =
   | Ptyp_constr ({ txt = Lident "option"; _ }, [ oct ]) -> ("opt", oct)
   | _ -> ("req", ct)
 
-let objN_enc_from_ldl ~loc ldl r_name =
+
+
+let objN_enc_from_ldl ~loc ldl rec_name =
   let label_list = List.map ~f:(fun x -> x.pld_name.txt) ldl in
   let core_type_list = List.map ~f:(fun x -> x.pld_type) ldl in
   let label_type_list = List.zip_exn label_list core_type_list in
@@ -160,23 +168,23 @@ let objN_enc_from_ldl ~loc ldl r_name =
         (T.pexp_ident ~loc { txt = Lident optionality; loc })
         [
           (Nolabel, T.pexp_constant ~loc (Pconst_string (lb, None)));
-          (Nolabel, generate_encoding ctd r_name);
+          (Nolabel, generate_encoding ctd rec_name);
         ] )
   in
   let reqs = List.map ~f:to_req label_type_list in
 
   T.pexp_apply ~loc objN reqs
 
-let rec make_obj_n ~loc ldl r_name =
+let rec make_obj_n ~loc ldl rec_name =
   let sz = List.length ldl in
-  if sz <= 10 then objN_enc_from_ldl ~loc ldl r_name
+  if sz <= 10 then objN_enc_from_ldl ~loc ldl rec_name
   else
     let l1, l2 = take_split (sz / 2) (* or 10 *) ldl in
     T.pexp_apply ~loc
       (T.pexp_ident ~loc { txt = Lident "merge_objs"; loc })
       [
-        (Nolabel, [%expr [%e make_obj_n ~loc l1 r_name]]);
-        (Nolabel, [%expr [%e make_obj_n ~loc l2 r_name]]);
+        (Nolabel, [%expr [%e make_obj_n ~loc l1 rec_name]]);
+        (Nolabel, [%expr [%e make_obj_n ~loc l2 rec_name]]);
       ]
 
 (* Single field record injection function *)
@@ -252,20 +260,20 @@ let fun_ll_proj ~loc lbl =
   in
   T.pexp_fun ~loc Nolabel None pat_var construct
 
-let single_field_record ~loc ld r_name =
+let single_field_record ~loc ld rec_name =
   let name = ld.pld_name.txt in
-  let type_enc = generate_encoding ld.pld_type r_name in
+  let type_enc = generate_encoding ld.pld_type rec_name in
   let f1 = fun_record_from_name_inj ~loc name in
   let f2 = fun_record_from_name_proj ~loc name in
   [%expr conv [%e f1] [%e f2] [%e type_enc]]
 
-let mult_field_record ~loc ldl r_name =
+let mult_field_record ~loc ldl rec_name =
   let label_list = List.map ~f:(fun x -> x.pld_name.txt) ldl in
   let f1 = fun_ll_inj ~loc label_list in
   let f2 = fun_ll_proj ~loc label_list in
   let enc =
-    if List.length ldl < 11 then objN_enc_from_ldl ~loc ldl r_name
-    else make_obj_n ~loc ldl r_name
+    if List.length ldl < 11 then objN_enc_from_ldl ~loc ldl rec_name
+    else make_obj_n ~loc ldl rec_name
   in
   [%expr conv [%e f1] [%e f2] [%e enc]]
 
@@ -401,12 +409,12 @@ let object1 ~loc enc cname =
     obj1 (req [%e T.pexp_constant ~loc (Pconst_string (cname, None))] [%e enc])]
 
 (* generage encoding from variants constructor argument *)
-let enc_from_carg ~loc carg cname r_name =
+let enc_from_carg ~loc carg cname rec_name =
   match carg with
-  | Pcstr_tuple [ ct ] -> object1 ~loc (generate_encoding ct r_name) cname
+  | Pcstr_tuple [ ct ] -> object1 ~loc (generate_encoding ct rec_name) cname
   | Pcstr_tuple [] -> object1 ~loc [%expr unit] cname
   | Pcstr_tuple ctl ->
-      object1 ~loc [%expr [%e make_tup_n ~loc ctl r_name]] cname
+      object1 ~loc [%expr [%e make_tup_n ~loc ctl rec_name]] cname
   | Pcstr_record _ ->
       Location.raise_errorf
         "[Ppx_encoding] : enc_from_carg -> Records should not appear here %s, "
@@ -414,16 +422,16 @@ let enc_from_carg ~loc carg cname r_name =
 
 (* single case variant encoding *)
 
-let encode_variant_tuple_conv ~loc cd r_name =
+let encode_variant_tuple_conv ~loc cd rec_name =
   let f1 = fun_from_constructor_inj ~loc cd in
   let f2 = fun_from_constructor_proj ~loc cd in
   [%expr
     conv [%e f1] [%e f2]
-      [%e enc_from_carg ~loc cd.pcd_args cd.pcd_name.txt r_name]]
+      [%e enc_from_carg ~loc cd.pcd_args cd.pcd_name.txt rec_name]]
 
 (* single case variant with inline record encoding *)
 
-let variant_inline_record_conv ~loc _ldl cd r_name =
+let variant_inline_record_conv ~loc _ldl cd rec_name =
   let label_list = List.map ~f:(fun x -> x.pld_name.txt) _ldl in
   let name = cd.pcd_name.txt in
   let constr =
@@ -474,8 +482,8 @@ let variant_inline_record_conv ~loc _ldl cd r_name =
   [%expr
     conv [%e f1] [%e f2]
       [%e
-        if List.length _ldl < 11 then objN_enc_from_ldl ~loc _ldl r_name
-        else make_obj_n ~loc _ldl r_name]]
+        if List.length _ldl < 11 then objN_enc_from_ldl ~loc _ldl rec_name
+        else make_obj_n ~loc _ldl rec_name]]
 
 (*  function case from constructor declaration *)
 
@@ -586,11 +594,11 @@ let function_from_constructor ~loc cd =
   | _ -> make_cases ~loc cd
 
 (*variant tuple case *)
-let generate_tuple_case ~loc h n r_name =
+let generate_tuple_case ~loc h n rec_name =
   let f1 = function_from_constructor ~loc h in
   let f2 = fun_from_constructor_proj ~loc h in
   let tag_id = T.pexp_constant ~loc (Pconst_integer (Int.to_string n, None)) in
-  let inner_encoding = enc_from_carg ~loc h.pcd_args h.pcd_name.txt r_name in
+  let inner_encoding = enc_from_carg ~loc h.pcd_args h.pcd_name.txt rec_name in
   [%expr
     case
       ~title:[%e T.pexp_constant ~loc (Pconst_string (h.pcd_name.txt, None))]
@@ -598,7 +606,7 @@ let generate_tuple_case ~loc h n r_name =
       [%e inner_encoding] [%e f1] [%e f2]]
 
 (*variant record projection function *)
-let fun_ll_record_dec ~loc lbl cstr_name =
+let fun_ll_record_dec ~loc lbl cstrec_name =
   let pat_var =
     if List.length lbl < 11 then
       T.ppat_tuple ~loc
@@ -607,7 +615,7 @@ let fun_ll_record_dec ~loc lbl cstr_name =
   in
   let construct =
     T.pexp_construct ~loc
-      { txt = Lident cstr_name; loc }
+      { txt = Lident cstrec_name; loc }
       (Some
          (T.pexp_record ~loc
             (List.map
@@ -649,7 +657,7 @@ let function_record_enc ~loc lbl cname =
   T.pexp_function ~loc case
 (*variant record union cases *)
 
-let generate_record_case ~loc ldl n cname r_name =
+let generate_record_case ~loc ldl n cname rec_name =
   let label_list = List.map ~f:(fun x -> x.pld_name.txt) ldl in
   let f1 = function_record_enc ~loc label_list cname in
   let f2 = fun_ll_record_dec ~loc label_list cname in
@@ -660,24 +668,24 @@ let generate_record_case ~loc ldl n cname r_name =
       (Tag [%e tag_id])
       [%e
         object1 ~loc
-          ( if List.length ldl < 11 then objN_enc_from_ldl ~loc ldl r_name
-          else make_obj_n ~loc ldl r_name )
+          ( if List.length ldl < 11 then objN_enc_from_ldl ~loc ldl rec_name
+          else make_obj_n ~loc ldl rec_name )
           cname]
       [%e f1] [%e f2]]
 (*variant union cases aux. function*)
 
-let rec generate_cases ~loc cdl n r_name =
+let rec generate_cases ~loc cdl n rec_name =
   match cdl with
   | [] -> []
   | h :: t -> (
       match h.pcd_args with
       | Pcstr_tuple _ ->
-          generate_tuple_case ~loc h n r_name
-          :: generate_cases ~loc t (n + 1) r_name
+          generate_tuple_case ~loc h n rec_name
+          :: generate_cases ~loc t (n + 1) rec_name
       | Pcstr_record lbl ->
-          generate_record_case ~loc lbl n h.pcd_name.txt r_name
-          :: generate_cases ~loc t (n + 1) r_name )
+          generate_record_case ~loc lbl n h.pcd_name.txt rec_name
+          :: generate_cases ~loc t (n + 1) rec_name )
 (*variant union cases *)
-let generate_cases ~loc cdl r_name =
+let generate_cases ~loc cdl rec_name =
   [%expr
-    union ~tag_size:`Uint8 [%e T.elist ~loc (generate_cases ~loc cdl 0 r_name)]]
+    union ~tag_size:`Uint8 [%e T.elist ~loc (generate_cases ~loc cdl 0 rec_name)]]

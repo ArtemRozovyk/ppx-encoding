@@ -44,11 +44,11 @@ let _ = encoding_of_par_type2
 
 [@@@end]
 
-type ('a, 'b, 'c) par_type2 = K of 'a * 'b * 'c 
+type ('a, 'b, 'c) par_type3 = K of 'a * 'b * 'c 
 [@@deriving_inline encoding]
 
-let _ = fun (_ : ('a, 'b, 'c) par_type2) -> ()
-let encoding_of_par_type2 =
+let _ = fun (_ : ('a, 'b, 'c) par_type3) -> ()
+let encoding_of_par_type3 =
   let open! Data_encoding in
     fun _a_encoding ->
       fun _b_encoding ->
@@ -56,6 +56,6 @@ let encoding_of_par_type2 =
           conv (fun (K (k0, k1, k2)) -> (k0, k1, k2))
             (fun (k0, k1, k2) -> K (k0, k1, k2))
             (obj1 (req "K" (tup3 _a_encoding _b_encoding _c_encoding)))
-let _ = encoding_of_par_type2
+let _ = encoding_of_par_type3
 
 [@@@end]
