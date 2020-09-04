@@ -22,7 +22,7 @@ type t =
   [@@deriving encoding]
 ```
 
-This will create an object named `encoding` since by convention, `t` is the main type of the module. For other names, the name will be `encoding_of_your_type_name`. 
+This will create a value named `encoding` since by convention, `t` is the main type of the module. For other names, the name will be `encoding_of_your_type_name`. 
 
 To look at what is produced you can generate the code at compile time by replacing `[@@deriving encoding]` by `[@@deriving_inline encoding][@@@end]` 
 and executing : 
