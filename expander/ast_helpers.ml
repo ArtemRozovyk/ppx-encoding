@@ -605,7 +605,7 @@ let generate_tuple_case ~loc h n rec_name =
       [%e inner_encoding] [%e f1] [%e f2]]
 
 (*variant record projection function *)
-let fun_ll_record_dec ~loc lbl cstrec_name =
+let fun_ll_record_dec ~loc lbl cstr_name =
   let pat_var =
     if List.length lbl < 11 then
       T.ppat_tuple ~loc
@@ -614,7 +614,7 @@ let fun_ll_record_dec ~loc lbl cstrec_name =
   in
   let construct =
     T.pexp_construct ~loc
-      { txt = Lident cstrec_name; loc }
+      { txt = Lident cstr_name; loc }
       (Some
          (T.pexp_record ~loc
             (List.map
