@@ -87,7 +87,7 @@ let encode_td td r_name =
       [%e body]]
 
 (* Entry point of the deriver*)
-let str_type_decl ~loc ~path:_ (_rf, tds) =
+let str_type_decl ~loc ~path:_ (rf, tds) =
   match tds with
   | [ td ] -> (
       (* Check if the type is effectively recursive, if so, keep
