@@ -60,7 +60,7 @@ let encode_td td r_name =
            empty variant"
     | Ptype_variant [ cd ] -> A.single_case_variant ~loc cd r_name
     | Ptype_variant cdl -> A.generate_cases ~loc cdl r_name
-    | Ptype_record [] -> [%expr []]
+    | Ptype_record [] -> assert false
     | Ptype_record [ ld ] -> A.single_field_record ~loc ld r_name
     | Ptype_record ldl -> A.mult_field_record ~loc ldl r_name
     | Ptype_open ->
