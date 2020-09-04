@@ -21,17 +21,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-
 (* The role of this module is to generate a structure_item that is Pstr_value 
 which corresponds to "let encoding_of...=.. . Only the essential information related 
 to the type is kept (its kind, parameters, whether it's recursive). The effective expression 
 generation containing all the verbous AST generation functions is delegated to ast_helpers." *)
 
-
 open Base
 module T = Ppxlib.Ast_builder.Default
 module A = Ast_helpers
-
 
 (*convert type parameters into label list*)
 let get_params_from_td td =

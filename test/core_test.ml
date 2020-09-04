@@ -62,7 +62,11 @@ let _ = encoding_of_t3
 type t4 = t2 [@@deriving_inline encoding]
 
 let _ = fun (_ : t4) -> ()
-let encoding_of_t4 = let open! Data_encoding in encoding_of_t2
+
+let encoding_of_t4 =
+  let open! Data_encoding in
+  encoding_of_t2
+
 let _ = encoding_of_t4
 
 [@@@end]
@@ -70,15 +74,23 @@ let _ = encoding_of_t4
 type t5 = int list [@@deriving_inline encoding]
 
 let _ = fun (_ : t5) -> ()
-let encoding_of_t5 = let open! Data_encoding in list int31
-let _ = encoding_of_t5
-[@@@end]
 
+let encoding_of_t5 =
+  let open! Data_encoding in
+  list int31
+
+let _ = encoding_of_t5
+
+[@@@end]
 
 type t6 = t list [@@deriving_inline encoding]
 
 let _ = fun (_ : t6) -> ()
-let encoding_of_t6 = let open! Data_encoding in list encoding
+
+let encoding_of_t6 =
+  let open! Data_encoding in
+  list encoding
+
 let _ = encoding_of_t6
 
 [@@@end]

@@ -3,14 +3,23 @@ type k = string list [@@deriving encoding]
 type todo1 = F of float | T of k [@@deriving_inline encoding]
 
 let _ = fun (_ : todo1) -> ()
+
 let encoding_of_todo1 =
   let open! Data_encoding in
-    union ~tag_size:`Uint8
-      [case ~title:"F" (Tag 0) (obj1 (req "F" float))
-         (function | F f -> Some f | _ -> None) (fun f -> F f);
-      case ~title:"T" (Tag 1) (obj1 (req "T" encoding_of_k))
-        (function | T t -> Some t | _ -> None) (fun t -> T t)]
+  union ~tag_size:`Uint8
+    [
+      case ~title:"F" (Tag 0)
+        (obj1 (req "F" float))
+        (function F f -> Some f | _ -> None)
+        (fun f -> F f);
+      case ~title:"T" (Tag 1)
+        (obj1 (req "T" encoding_of_k))
+        (function T t -> Some t | _ -> None)
+        (fun t -> T t);
+    ]
+
 let _ = encoding_of_todo1
+
 [@@@end]
 
 type var_type = A of int | B of string | C of int [@@deriving_inline encoding]
@@ -19,19 +28,27 @@ let _ = fun (_ : var_type) -> ()
 
 let encoding_of_var_type =
   let open! Data_encoding in
-    union ~tag_size:`Uint8
-      [case ~title:"A" (Tag 0) (obj1 (req "A" int31))
-         (function | A a -> Some a | _ -> None) (fun a -> A a);
-      case ~title:"B" (Tag 1) (obj1 (req "B" string))
-        (function | B b -> Some b | _ -> None) (fun b -> B b);
-      case ~title:"C" (Tag 2) (obj1 (req "C" int31))
-        (function | C c -> Some c | _ -> None) (fun c -> C c)]
+  union ~tag_size:`Uint8
+    [
+      case ~title:"A" (Tag 0)
+        (obj1 (req "A" int31))
+        (function A a -> Some a | _ -> None)
+        (fun a -> A a);
+      case ~title:"B" (Tag 1)
+        (obj1 (req "B" string))
+        (function B b -> Some b | _ -> None)
+        (fun b -> B b);
+      case ~title:"C" (Tag 2)
+        (obj1 (req "C" int31))
+        (function C c -> Some c | _ -> None)
+        (fun c -> C c);
+    ]
+
 let _ = encoding_of_var_type
 
 [@@@end]
 
 type t = string list [@@deriving encoding]
-
 
 type t2 = string list [@@deriving encoding]
 
@@ -41,13 +58,22 @@ let _ = fun (_ : var_type2) -> ()
 
 let encoding_of_var_type2 =
   let open! Data_encoding in
-    union ~tag_size:`Uint8
-      [case ~title:"D" (Tag 0) (obj1 (req "D" encoding_of_t2))
-         (function | D d -> Some d | _ -> None) (fun d -> D d);
-      case ~title:"E" (Tag 1) (obj1 (req "E" (list int31)))
-        (function | E e -> Some e | _ -> None) (fun e -> E e);
-      case ~title:"F" (Tag 2) (obj1 (req "F" unit))
-        (function | F -> Some () | _ -> None) (fun () -> F)]
+  union ~tag_size:`Uint8
+    [
+      case ~title:"D" (Tag 0)
+        (obj1 (req "D" encoding_of_t2))
+        (function D d -> Some d | _ -> None)
+        (fun d -> D d);
+      case ~title:"E" (Tag 1)
+        (obj1 (req "E" (list int31)))
+        (function E e -> Some e | _ -> None)
+        (fun e -> E e);
+      case ~title:"F" (Tag 2)
+        (obj1 (req "F" unit))
+        (function F -> Some () | _ -> None)
+        (fun () -> F);
+    ]
+
 let _ = encoding_of_var_type2
 
 [@@@end]
@@ -110,18 +136,21 @@ let _ = fun (_ : todo12) -> ()
 
 let encoding_of_todo12 =
   let open! Data_encoding in
-    union ~tag_size:`Uint8
-      [case ~title:"F" (Tag 0) (obj1 (req "F" float))
-         (function | F f -> Some f | _ -> None) (fun f -> F f);
+  union ~tag_size:`Uint8
+    [
+      case ~title:"F" (Tag 0)
+        (obj1 (req "F" float))
+        (function F f -> Some f | _ -> None)
+        (fun f -> F f);
       case ~title:"Sq" (Tag 1)
         (obj1 (req "Sq" (obj1 (req "lol" encoding_of_ke))))
-        (function | Sq { lol } -> Some lol | _ -> None)
+        (function Sq { lol } -> Some lol | _ -> None)
         (fun lol -> Sq { lol });
       case ~title:"Di" (Tag 2)
-        (obj1
-           (req "Di" (obj2 (req "carpio" encoding_of_ke) (req "la" int31))))
-        (function | Di { carpio; la } -> Some (carpio, la) | _ -> None)
-        (fun (carpio, la) -> Di { carpio; la })]
+        (obj1 (req "Di" (obj2 (req "carpio" encoding_of_ke) (req "la" int31))))
+        (function Di { carpio; la } -> Some (carpio, la) | _ -> None)
+        (fun (carpio, la) -> Di { carpio; la });
+    ]
 
 let _ = encoding_of_todo12
 

@@ -1,12 +1,10 @@
-
-
 (* This module contains all the functions that generate the expression of the 
 Data_encoding.encoding based on the type declaration. *)
 
 open Ppxlib (*open is needed in order to be able to use metaquot*)
+
 open Base
 module T = Ppxlib.Ast_builder.Default
-
 
 let name_of_type_name = function
   | "t" -> "encoding"
@@ -150,8 +148,6 @@ let make_obj_arg ct =
   match ct.ptyp_desc with
   | Ptyp_constr ({ txt = Lident "option"; _ }, [ oct ]) -> ("opt", oct)
   | _ -> ("req", ct)
-
-
 
 let objN_enc_from_ldl ~loc ldl rec_name =
   let label_list = List.map ~f:(fun x -> x.pld_name.txt) ldl in
@@ -571,6 +567,7 @@ let case_from_constructor_decl1_var ~loc cd =
       (Some (T.pexp_ident ~loc { txt = Lident name; loc }))
   in
   T.case ~lhs ~guard:None ~rhs
+
 (* function fcase from constructor declaration  *)
 let case_from_cdl ~loc cd =
   match cd.pcd_args with
@@ -580,11 +577,13 @@ let case_from_cdl ~loc cd =
       Location.raise_errorf ~loc
         "[Ppx_encoding] : case_from_cdl ->Error generating argument type of %s"
         cd.pcd_name.txt
+
 (* projection function for non empty constructor    *)
 let make_cases ~loc cd =
   let case = [ case_from_cdl ~loc cd ] in
   let case = case @ [ case_from_constructor_decl2 ~loc ] in
   T.pexp_function ~loc case
+
 (*  function for variants union*)
 
 let function_from_constructor ~loc cd =
@@ -655,6 +654,7 @@ let function_record_enc ~loc lbl cname =
   let case = [ record_case_from_constructor_decl1 ~loc lbl cname ] in
   let case = case @ [ case_from_constructor_decl2 ~loc ] in
   T.pexp_function ~loc case
+
 (*variant record union cases *)
 
 let generate_record_case ~loc ldl n cname rec_name =
@@ -672,6 +672,7 @@ let generate_record_case ~loc ldl n cname rec_name =
           else make_obj_n ~loc ldl rec_name )
           cname]
       [%e f1] [%e f2]]
+
 (*variant union cases aux. function*)
 
 let rec generate_cases ~loc cdl n rec_name =
@@ -685,7 +686,9 @@ let rec generate_cases ~loc cdl n rec_name =
       | Pcstr_record lbl ->
           generate_record_case ~loc lbl n h.pcd_name.txt rec_name
           :: generate_cases ~loc t (n + 1) rec_name )
+
 (*variant union cases *)
 let generate_cases ~loc cdl rec_name =
   [%expr
-    union ~tag_size:`Uint8 [%e T.elist ~loc (generate_cases ~loc cdl 0 rec_name)]]
+    union ~tag_size:`Uint8
+      [%e T.elist ~loc (generate_cases ~loc cdl 0 rec_name)]]

@@ -21,9 +21,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-
 open Ppxlib
 
 let encoding =
   Deriving.add "encoding"
-    ~str_type_decl:(Deriving.Generator.make_noarg Ppx_encoding_expander.str_type_decl)
+    ~str_type_decl:
+      (Deriving.Generator.make_noarg Ppx_encoding_expander.str_type_decl)
