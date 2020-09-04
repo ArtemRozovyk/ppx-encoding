@@ -3,7 +3,7 @@
 (* This module contains all the functions that generate the expression of the 
 Data_encoding.encoding based on the type declaration. *)
 
-open Ppxlib
+open Ppxlib (*open is needed in order to be able to use metaquot*)
 open Base
 module T = Ppxlib.Ast_builder.Default
 
