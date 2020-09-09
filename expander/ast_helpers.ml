@@ -555,9 +555,9 @@ let record_case_from_constructor_decl1 ~loc lbl name =
   T.case ~lhs ~guard:None ~rhs
 
 let function_record_enc ~loc lbl cname =
-  let case = [ record_case_from_constructor_decl1 ~loc lbl cname ] in
-  let case = case @ [ case_from_constructor_decl2 ~loc ] in
-  T.pexp_function ~loc case
+  let case1 = record_case_from_constructor_decl1 ~loc lbl cname in
+  let case2 = case_from_constructor_decl2 ~loc in
+  T.pexp_function ~loc [ case1; case2 ]
 
 (*variant record union cases *)
 
