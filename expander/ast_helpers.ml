@@ -21,30 +21,23 @@ let rec take_a n list tl =
 n elements of the initial list and l2 containst the rets *)
 let take_split n list = take_a n list []
 
-let rec make_nested_ppat_tuple ~loc ctl =
-  (* to call with numbered label list*)
-  let l1, l2 = take_split (List.length ctl / 2) ctl in
-  let make_arg g =
-    if List.length g < 11 then
-      T.ppat_tuple ~loc
-        (List.map ~f:(fun l -> T.ppat_var ~loc { txt = l; loc }) g)
-    else make_nested_ppat_tuple ~loc g
-  in
-  let arg1 = make_arg l1 in
-  let arg2 = make_arg l2 in
-  T.ppat_tuple ~loc [ arg1; arg2 ]
-
-(* make tuple expression from label list*)
-let rec make_nested_pexp_tuple ~loc ctl =
-  (* to call with numbered label list*)
+let rec make_nested_tuple ~loc make_tuple_element make_tuple ctl =
+  (* to call with (unique) numbered label list*)
   if List.length ctl < 11 then
-    T.pexp_tuple ~loc
-      (List.map ~f:(fun l -> T.pexp_ident ~loc { txt = Lident l; loc }) ctl)
+    make_tuple ~loc (List.map ~f:(fun l -> make_tuple_element l) ctl)
   else
     let l1, l2 = take_split (List.length ctl / 2) ctl in
-    let arg1 = make_nested_pexp_tuple ~loc l1 in
-    let arg2 = make_nested_pexp_tuple ~loc l2 in
-    T.pexp_tuple ~loc [ arg1; arg2 ]
+    let arg1 = make_nested_tuple ~loc make_tuple_element make_tuple l1 in
+    let arg2 = make_nested_tuple ~loc make_tuple_element make_tuple l2 in
+    make_tuple ~loc [ arg1; arg2 ]
+
+let make_nested_ppat_tuple ~loc ctl =
+  (* to call with (unique) numbered label list*)
+  make_nested_tuple ~loc (fun l -> T.ppat_var ~loc { txt = l; loc }) T.ppat_tuple ctl
+
+(* make tuple expression from label list*)
+let  make_nested_pexp_tuple ~loc ctl =
+  make_nested_tuple ~loc (fun l -> T.pexp_ident ~loc { txt = Lident l; loc }) T.pexp_tuple ctl
 
 let fun_tuple_inj ~loc ctl =
   let pat_var =
@@ -61,14 +54,8 @@ let fun_tuple_inj ~loc ctl =
 
 let fun_tuple_proj ~loc ctl =
   let pat_var =
-    if List.length ctl < 11 then
-      T.ppat_tuple ~loc
-        (List.mapi
-           ~f:(fun i _ -> T.ppat_var ~loc { txt = "v" ^ Int.to_string i; loc })
-           ctl)
-    else
-      make_nested_ppat_tuple ~loc
-        (List.mapi ~f:(fun i _ -> "v" ^ Int.to_string i) ctl)
+    make_nested_ppat_tuple ~loc
+      (List.mapi ~f:(fun i _ -> "v" ^ Int.to_string i) ctl)
   in
   let construct =
     T.pexp_tuple ~loc
@@ -223,12 +210,7 @@ let fun_ll_inj ~loc lbl =
 (* Multiple field record projection function *)
 
 let fun_ll_proj ~loc lbl =
-  let pat_var =
-    if List.length lbl < 11 then
-      T.ppat_tuple ~loc
-        (List.map ~f:(fun name -> T.ppat_var ~loc { txt = name; loc }) lbl)
-    else make_nested_ppat_tuple ~loc lbl
-  in
+  let pat_var = make_nested_ppat_tuple ~loc lbl in
   let construct =
     T.pexp_record ~loc
       (List.map
@@ -315,16 +297,8 @@ let fun_from_constructor_inj ~loc cd =
 let construct_fun_tuple_proj ~loc cd ctl =
   let name = String.lowercase cd.pcd_name.txt in
   let pat_var =
-    if List.length ctl < 11 then
-      T.ppat_tuple ~loc
-        (List.mapi
-           ~f:(fun i _ ->
-             T.ppat_var ~loc
-               { txt = String.lowercase name ^ Int.to_string i; loc })
-           ctl)
-    else
-      make_nested_ppat_tuple ~loc
-        (List.mapi ~f:(fun i _ -> String.lowercase name ^ Int.to_string i) ctl)
+    make_nested_ppat_tuple ~loc
+      (List.mapi ~f:(fun i _ -> String.lowercase name ^ Int.to_string i) ctl)
   in
   let construct =
     T.pexp_construct ~loc
@@ -427,11 +401,6 @@ let variant_inline_record_conv ~loc _ldl cd rec_name =
     (*if multiple ld then tuple *)
     if List.length label_list = 1 then
       T.ppat_var ~loc { txt = List.hd_exn label_list; loc }
-    else if List.length _ldl < 11 then
-      T.ppat_tuple ~loc
-        (List.map
-           ~f:(fun name -> T.ppat_var ~loc { txt = name; loc })
-           label_list)
     else make_nested_ppat_tuple ~loc label_list
   in
   let f2 =
@@ -566,12 +535,7 @@ let generate_tuple_case ~loc h n rec_name =
 
 (*variant record projection function *)
 let fun_ll_record_dec ~loc lbl cstr_name =
-  let pat_var =
-    if List.length lbl < 11 then
-      T.ppat_tuple ~loc
-        (List.map ~f:(fun name -> T.ppat_var ~loc { txt = name; loc }) lbl)
-    else make_nested_ppat_tuple ~loc lbl
-  in
+  let pat_var = make_nested_ppat_tuple ~loc lbl in
   let construct =
     T.pexp_construct ~loc
       { txt = Lident cstr_name; loc }
