@@ -4,10 +4,7 @@ val name_of_type_name : Base.String.t -> Base.String.t
 
 val generate_encoding : Ppxlib.core_type -> string option -> Ppxlib.expression
 
-val take_a :
-  Base__Int.t -> 'a list -> 'a Base__List.t -> 'a Base__List.t * 'a list
 
-val take_split : Base__Int.t -> 'a list -> 'a Base__List.t * 'a list
 
 val make_obj_arg : Ppxlib.core_type -> string * Ppxlib.core_type
 

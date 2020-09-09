@@ -10,23 +10,12 @@ let name_of_type_name = function
   | "t" -> "encoding"
   | type_name -> "encoding_of_" ^ type_name
 
-let rec take_a n list tl =
-  if n > 0 then
-    match list with
-    | [] -> failwith "Not enough elements in list"
-    | x :: xs -> take_a (n - 1) xs (tl @ [ x ])
-  else (tl, list)
-
-(* split list into two lists (l1,l2) such that l1 contains 
-n elements of the initial list and l2 containst the rets *)
-let take_split n list = take_a n list []
-
 let rec make_nested_tuple ~loc make_tuple_element make_tuple ctl =
   (* to call with (unique) numbered label list*)
   if List.length ctl < 11 then
     make_tuple ~loc (List.map ~f:(fun l -> make_tuple_element l) ctl)
   else
-    let l1, l2 = take_split (List.length ctl / 2) ctl in
+    let l1, l2 = List.split_n ctl (List.length ctl / 2) in
     let arg1 = make_nested_tuple ~loc make_tuple_element make_tuple l1 in
     let arg2 = make_nested_tuple ~loc make_tuple_element make_tuple l2 in
     make_tuple ~loc [ arg1; arg2 ]
@@ -105,7 +94,7 @@ and make_tup_n ~loc ctl rec_name =
       (T.pexp_ident ~loc { txt = Lident ("tup" ^ Int.to_string sz); loc })
       (List.map ~f:(fun ct -> (Nolabel, generate_encoding ct rec_name)) ctl)
   else
-    let l1, l2 = take_split (sz / 2) (* or 10 *) ctl in
+    let l1, l2 = List.split_n ctl (sz / 2) (* or 10 *)  in
     T.pexp_apply ~loc
       (T.pexp_ident ~loc { txt = Lident "merge_tups"; loc })
       [
@@ -153,7 +142,7 @@ let rec make_obj_n ~loc ldl rec_name =
   let sz = List.length ldl in
   if sz <= 10 then objN_enc_from_ldl ~loc ldl rec_name
   else
-    let l1, l2 = take_split (sz / 2) (* or 10 *) ldl in
+    let l1, l2 = List.split_n ldl  (sz / 2) (* or 10 *) in
     T.pexp_apply ~loc
       (T.pexp_ident ~loc { txt = Lident "merge_objs"; loc })
       [
