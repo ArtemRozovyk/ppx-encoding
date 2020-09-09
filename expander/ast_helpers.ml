@@ -435,7 +435,15 @@ let case_from_constructor_decl1_tuple ~loc cd ctl =
 
 (* single case variant encoding *)
 
+let check_gadt ~loc pcd_res =
+  match pcd_res with
+  | None -> ()
+  | Some _ ->
+      Location.raise_errorf ~loc
+        "[Ppx_encoding] : -> GADT are not supported at the moment."
+
 let single_case_variant ~loc cd =
+  check_gadt ~loc cd.pcd_res;
   match cd.pcd_args with
   | Pcstr_tuple _ -> encode_variant_tuple_conv ~loc cd
   | Pcstr_record ldl -> variant_inline_record_conv ~loc ldl cd
@@ -580,6 +588,7 @@ let generate_record_case ~loc ldl n cname rec_name =
 (*variant union cases aux. function*)
 
 let generate_case ~loc h i rec_name =
+  check_gadt ~loc h.pcd_res;
   match h.pcd_args with
   | Pcstr_tuple _ -> generate_tuple_case ~loc h i rec_name
   | Pcstr_record lbl -> generate_record_case ~loc lbl i h.pcd_name.txt rec_name
