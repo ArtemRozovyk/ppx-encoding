@@ -461,7 +461,7 @@ let case_from_constructor_decl1_unit ~loc name =
   T.case ~lhs ~guard:None ~rhs
 
 (* projection function for empty constructor    *)
-let make_cases_unit ~loc cd =
+let make_cases_constant ~loc cd =
   let cname = cd.pcd_name.txt in
   let case = [ case_from_constructor_decl1_unit ~loc cname ] in
   let case = case @ [ case_from_constructor_decl2 ~loc ] in
@@ -503,7 +503,7 @@ let make_cases ~loc cd =
 
 let function_from_constructor ~loc cd =
   match cd.pcd_args with
-  | Pcstr_tuple [] -> make_cases_unit ~loc cd
+  | Pcstr_tuple [] -> make_cases_constant ~loc cd
   | Pcstr_tuple _ -> make_cases ~loc cd
   | _ -> make_cases ~loc cd
 
