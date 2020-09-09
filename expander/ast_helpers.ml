@@ -58,22 +58,22 @@ let fun_tuple_proj ~loc ctl =
 (* Construct an expression that represents the encoding of
  a core type (ast leafs) *)
 let rec generate_encoding core_t rec_name =
-  let loc = { core_t.ptyp_loc with loc_ghost = true } in
+  let loc = { core_t.ptyp_loc with loc = true } in
   match core_t.ptyp_desc with
   | Ptyp_tuple ctl -> conv_tuples ~loc ctl rec_name
-  | Ptyp_constr ({ txt = Ldot (modules, typ); _ }, _) ->
+  | Ptyp_constr ({ txt = Ldot (modules, typ); loc }, _) ->
       let ldot_type_enc_name = name_of_type_name typ in
       [%expr
         [%e T.pexp_ident ~loc { txt = Ldot (modules, ldot_type_enc_name); loc }]]
-  | Ptyp_constr ({ txt = Lident "list"; _ }, [ tp ]) ->
+  | Ptyp_constr ({ txt = Lident "list"; loc }, [ tp ]) ->
       [%expr list [%e generate_encoding tp rec_name]]
-  | Ptyp_constr ({ txt = Lident "string"; _ }, []) -> [%expr string]
-  | Ptyp_constr ({ txt = Lident "int"; _ }, []) -> [%expr int31]
-  | Ptyp_constr ({ txt = Lident "float"; _ }, []) -> [%expr float]
-  | Ptyp_constr ({ txt = Lident "bool"; _ }, []) -> [%expr bool]
-  | Ptyp_constr ({ txt = Lident "option"; _ }, [ ct ]) ->
+  | Ptyp_constr ({ txt = Lident "string"; loc }, []) -> [%expr string]
+  | Ptyp_constr ({ txt = Lident "int"; loc }, []) -> [%expr int31]
+  | Ptyp_constr ({ txt = Lident "float"; loc }, []) -> [%expr float]
+  | Ptyp_constr ({ txt = Lident "bool"; loc }, []) -> [%expr bool]
+  | Ptyp_constr ({ txt = Lident "option"; loc }, [ ct ]) ->
       [%expr option [%e generate_encoding ct rec_name]]
-  | Ptyp_constr ({ txt = Lident id; _ }, _) ->
+  | Ptyp_constr ({ txt = Lident id; loc }, _) ->
       let type_enc_name =
         match rec_name with
         | Some rn when String.equal rn id -> id ^ "_encoding"
