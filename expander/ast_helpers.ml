@@ -593,6 +593,11 @@ let rec generate_cases ~loc cdl n rec_name =
 
 (*variant union cases *)
 let generate_cases ~loc cdl rec_name =
-  [%expr
-    union ~tag_size:`Uint8
-      [%e T.elist ~loc (generate_cases ~loc cdl 0 rec_name)]]
+  if List.length cdl <= 256 then
+    [%expr
+      union ~tag_size:`Uint8
+        [%e T.elist ~loc (generate_cases ~loc cdl 0 rec_name)]]
+  else
+    Location.raise_errorf ~loc
+      "[Ppx_encoding] : generate_cases -> Cannot generate an encoding for more \
+       than 256 cases."
