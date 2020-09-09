@@ -100,8 +100,8 @@ and make_tup_n ~loc ctl rec_name =
     T.pexp_apply ~loc
       (T.pexp_ident ~loc { txt = Lident "merge_tups"; loc })
       [
-        (Nolabel, [%expr [%e make_tup_n ~loc l1 rec_name]]);
-        (Nolabel, [%expr [%e make_tup_n ~loc l2 rec_name]]);
+        (Nolabel, make_tup_n ~loc l1 rec_name);
+        (Nolabel, make_tup_n ~loc l2 rec_name);
       ]
 
 and conv_tuples ~loc ctl rec_name =
@@ -148,8 +148,8 @@ let rec make_obj_n ~loc ldl rec_name =
     T.pexp_apply ~loc
       (T.pexp_ident ~loc { txt = Lident "merge_objs"; loc })
       [
-        (Nolabel, [%expr [%e make_obj_n ~loc l1 rec_name]]);
-        (Nolabel, [%expr [%e make_obj_n ~loc l2 rec_name]]);
+        (Nolabel, make_obj_n ~loc l1 rec_name);
+        (Nolabel, make_obj_n ~loc l2 rec_name);
       ]
 
 (* Single field record injection function *)
@@ -350,8 +350,7 @@ let enc_from_carg ~loc carg cname rec_name =
   match carg with
   | Pcstr_tuple [ ct ] -> object1 ~loc (generate_encoding ct rec_name) cname
   | Pcstr_tuple [] -> object1 ~loc [%expr unit] cname
-  | Pcstr_tuple ctl ->
-      object1 ~loc [%expr [%e make_tup_n ~loc ctl rec_name]] cname
+  | Pcstr_tuple ctl -> object1 ~loc (make_tup_n ~loc ctl rec_name) cname
   | Pcstr_record _ ->
       Location.raise_errorf
         "[Ppx_encoding] : enc_from_carg -> Records should not appear here %s, "
