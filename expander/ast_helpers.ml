@@ -22,11 +22,15 @@ let rec make_nested_tuple ~loc make_tuple_element make_tuple ctl =
 
 let make_nested_ppat_tuple ~loc ctl =
   (* to call with (unique) numbered label list*)
-  make_nested_tuple ~loc (fun l -> T.ppat_var ~loc { txt = l; loc }) T.ppat_tuple ctl
+  make_nested_tuple ~loc
+    (fun l -> T.ppat_var ~loc { txt = l; loc })
+    T.ppat_tuple ctl
 
 (* make tuple expression from label list*)
-let  make_nested_pexp_tuple ~loc ctl =
-  make_nested_tuple ~loc (fun l -> T.pexp_ident ~loc { txt = Lident l; loc }) T.pexp_tuple ctl
+let make_nested_pexp_tuple ~loc ctl =
+  make_nested_tuple ~loc
+    (fun l -> T.pexp_ident ~loc { txt = Lident l; loc })
+    T.pexp_tuple ctl
 
 let fun_tuple_inj ~loc ctl =
   let pat_var =
@@ -58,31 +62,29 @@ let fun_tuple_proj ~loc ctl =
 (* Construct an expression that represents the encoding of
  a core type (ast leafs) *)
 let rec generate_encoding core_t rec_name =
-  let loc = { core_t.ptyp_loc with loc = true } in
+  let loc = { core_t.ptyp_loc with loc_ghost = true } in
   match core_t.ptyp_desc with
   | Ptyp_tuple ctl -> conv_tuples ~loc ctl rec_name
   | Ptyp_constr ({ txt = Ldot (modules, typ); loc }, _) ->
       let ldot_type_enc_name = name_of_type_name typ in
-      [%expr
-        [%e T.pexp_ident ~loc { txt = Ldot (modules, ldot_type_enc_name); loc }]]
-  | Ptyp_constr ({ txt = Lident "list"; loc }, [ tp ]) ->
-      [%expr list [%e generate_encoding tp rec_name]]
+      T.pexp_ident ~loc { txt = Ldot (modules, ldot_type_enc_name); loc }
   | Ptyp_constr ({ txt = Lident "string"; loc }, []) -> [%expr string]
   | Ptyp_constr ({ txt = Lident "int"; loc }, []) -> [%expr int31]
   | Ptyp_constr ({ txt = Lident "float"; loc }, []) -> [%expr float]
   | Ptyp_constr ({ txt = Lident "bool"; loc }, []) -> [%expr bool]
   | Ptyp_constr ({ txt = Lident "option"; loc }, [ ct ]) ->
       [%expr option [%e generate_encoding ct rec_name]]
+  | Ptyp_constr ({ txt = Lident "list"; loc }, [ tp ]) ->
+      [%expr list [%e generate_encoding tp rec_name]]
   | Ptyp_constr ({ txt = Lident id; loc }, _) ->
       let type_enc_name =
         match rec_name with
         | Some rn when String.equal rn id -> id ^ "_encoding"
         | _ -> name_of_type_name id
       in
-      [%expr [%e T.pexp_ident ~loc { txt = Lident type_enc_name; loc }]]
+      T.pexp_ident ~loc { txt = Lident type_enc_name; loc }
   | Ptyp_var name ->
-      [%expr
-        [%e T.pexp_ident ~loc { txt = Lident ("_" ^ name ^ "_encoding"); loc }]]
+      T.pexp_ident ~loc { txt = Lident ("_" ^ name ^ "_encoding"); loc }
   | _ ->
       Location.raise_errorf ~loc
         " [Ppx_encoding] : generate_encoding -> Unsupported type"
@@ -94,7 +96,7 @@ and make_tup_n ~loc ctl rec_name =
       (T.pexp_ident ~loc { txt = Lident ("tup" ^ Int.to_string sz); loc })
       (List.map ~f:(fun ct -> (Nolabel, generate_encoding ct rec_name)) ctl)
   else
-    let l1, l2 = List.split_n ctl (sz / 2) (* or 10 *)  in
+    let l1, l2 = List.split_n ctl (sz / 2) (* or 10 *) in
     T.pexp_apply ~loc
       (T.pexp_ident ~loc { txt = Lident "merge_tups"; loc })
       [
@@ -142,7 +144,7 @@ let rec make_obj_n ~loc ldl rec_name =
   let sz = List.length ldl in
   if sz <= 10 then objN_enc_from_ldl ~loc ldl rec_name
   else
-    let l1, l2 = List.split_n ldl  (sz / 2) (* or 10 *) in
+    let l1, l2 = List.split_n ldl (sz / 2) (* or 10 *) in
     T.pexp_apply ~loc
       (T.pexp_ident ~loc { txt = Lident "merge_objs"; loc })
       [
