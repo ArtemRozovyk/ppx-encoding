@@ -75,7 +75,7 @@ let encode_td td rec_name =
   in
   let encode =
     match rec_name with
-    | Some _ -> [%expr [%e A.apply_mu_op ~loc td.ptype_name.txt encode]]
+    | Some _ ->  A.apply_mu_op ~loc td.ptype_name.txt encode
     | None -> encode
   in
   let name = A.name_of_type_name td.Ppxlib.ptype_name.txt in
