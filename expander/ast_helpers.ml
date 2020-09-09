@@ -579,24 +579,19 @@ let generate_record_case ~loc ldl n cname rec_name =
 
 (*variant union cases aux. function*)
 
-let rec generate_cases ~loc cdl n rec_name =
-  match cdl with
-  | [] -> []
-  | h :: t -> (
-      match h.pcd_args with
-      | Pcstr_tuple _ ->
-          generate_tuple_case ~loc h n rec_name
-          :: generate_cases ~loc t (n + 1) rec_name
-      | Pcstr_record lbl ->
-          generate_record_case ~loc lbl n h.pcd_name.txt rec_name
-          :: generate_cases ~loc t (n + 1) rec_name )
+let generate_case ~loc h i rec_name =
+  match h.pcd_args with
+  | Pcstr_tuple _ -> generate_tuple_case ~loc h i rec_name
+  | Pcstr_record lbl -> generate_record_case ~loc lbl i h.pcd_name.txt rec_name
 
 (*variant union cases *)
 let generate_cases ~loc cdl rec_name =
   if List.length cdl <= 256 then
     [%expr
       union ~tag_size:`Uint8
-        [%e T.elist ~loc (generate_cases ~loc cdl 0 rec_name)]]
+        [%e
+          T.elist ~loc
+            (List.mapi ~f:(fun i cd -> generate_case ~loc cd i rec_name) cdl)]]
   else
     Location.raise_errorf ~loc
       "[Ppx_encoding] : generate_cases -> Cannot generate an encoding for more \
