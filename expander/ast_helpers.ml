@@ -119,22 +119,21 @@ let make_obj_arg ct =
   | _ -> ("req", ct)
 
 let objN_enc_from_ldl ~loc ldl rec_name =
-  let label_type_list = List.map ~f:(fun x -> (x.pld_name.txt,x.pld_type)) ldl in
   let objN =
     T.pexp_ident ~loc (* *)
       { txt = Lident ("obj" ^ Int.to_string (List.length ldl)); loc }
   in
-  let to_req (lb, ct) =
-    let optionality, ctd = make_obj_arg ct in
+  let to_req ld =
+    let optionality, ctd = make_obj_arg ld.pld_type in
     ( Nolabel,
       T.pexp_apply ~loc
         (T.pexp_ident ~loc { txt = Lident optionality; loc })
         [
-          (Nolabel, T.pexp_constant ~loc (Pconst_string (lb, None)));
+          (Nolabel, T.pexp_constant ~loc (Pconst_string (ld.pld_name.txt, None)));
           (Nolabel, generate_encoding ctd rec_name);
         ] )
   in
-  let reqs = List.map ~f:to_req label_type_list in
+  let reqs = List.map ~f:to_req ldl in
   T.pexp_apply ~loc objN reqs
 
 let rec make_obj_n ~loc ldl rec_name =
