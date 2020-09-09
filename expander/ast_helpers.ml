@@ -119,9 +119,7 @@ let make_obj_arg ct =
   | _ -> ("req", ct)
 
 let objN_enc_from_ldl ~loc ldl rec_name =
-  let label_list = List.map ~f:(fun x -> x.pld_name.txt) ldl in
-  let core_type_list = List.map ~f:(fun x -> x.pld_type) ldl in
-  let label_type_list = List.zip_exn label_list core_type_list in
+  let label_type_list = List.map ~f:(fun x -> (x.pld_name.txt,x.pld_type)) ldl in
   let objN =
     T.pexp_ident ~loc (* *)
       { txt = Lident ("obj" ^ Int.to_string (List.length ldl)); loc }
@@ -137,7 +135,6 @@ let objN_enc_from_ldl ~loc ldl rec_name =
         ] )
   in
   let reqs = List.map ~f:to_req label_type_list in
-
   T.pexp_apply ~loc objN reqs
 
 let rec make_obj_n ~loc ldl rec_name =
