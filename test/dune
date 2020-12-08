@@ -1,0 +1,5 @@
+(library
+ (name encoding_test)
+ (inline_tests)
+ (libraries ppxlib base data-encoding )
+ (preprocess (pps ppx_inline_test ppx_encoding)))
